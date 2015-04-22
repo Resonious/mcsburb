@@ -21,3 +21,5 @@ eclipse/
 **/.gradle
 eclipse
 .settings
+local.properties
+gradle.properties
