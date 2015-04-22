@@ -39,6 +39,7 @@ import java.util.Random
 import net.minecraftforge.client.IItemRenderer
 import net.resonious.sburb.blocks.GristShopItem
 import net.resonious.sburb.game.grist.GristShopItemRenderer
+import net.dinkyman.sburb.DMain
 
 @Mod(modid = "sburb", version = "0.0.0", modLanguage = "scala")
 object Sburb {
@@ -99,6 +100,8 @@ object Sburb {
     logger = event.getModLog
     _isClient = event.getSide == Side.CLIENT
     _isServer = event.getSide == Side.SERVER
+
+    DMain.preInit(event)
   }
 
   @EventHandler
@@ -184,11 +187,14 @@ object Sburb {
 
     // Run implicit constructor:
     SburbServerMode
+
+    DMain.init(event)
   }
 
   @EventHandler
   def postInit(event: FMLPostInitializationEvent) {
     PacketPipeline.postInitialise
+    DMain.postInit(event)
   }
 
   @EventHandler
