@@ -1,0 +1,16 @@
+[
+{
+  "modid": "sburb",
+  "name": "Sburb",
+  "description": "Homestuck!",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["Nigel Baillie"],
+  "credits": "Nigel Baillie yeeeeah",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
