@@ -1,0 +1,14 @@
+item.test_modus.name=Test Modus
+
+item.build_grist.name=Build Grist
+item.amber_grist.name=Amber Grist
+
+item.sburb_disc.name=Nonfunctional Sburb Disc
+item.cruxtruder.name=Nonfunctional Cruxtruder
+tile.computer.name=Nonfunctional Computer
+tile.house_indicator.name=House Assignment Block
+tile.cruxtruder_block.name=Cruxtruder Block
+tile.house_extension_1.name=Basic Block 1
+tile.house_extension_1_stairs.name=Basic Stairs 1
+
+key.grist_shop=Grist Shop
