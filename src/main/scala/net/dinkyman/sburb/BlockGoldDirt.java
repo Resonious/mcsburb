@@ -12,7 +12,13 @@ public class BlockGoldDirt extends Block
 	{
 		super(Material.grass);
 		setBlockName("goldDirt");
-		setBlockTextureName(Reference.MODID + ":" + getUnlocalizedName().substring(5));
+                // FIX: It may have not worked because the mod id in your
+                // Reference class wasn't actually a registered mod.
+                // For now, we'll use the 'sburb' mod ID (which is registered
+                // in sburb.scala)
+                // Additionally, I have moved your texture to the sburb
+                // directory.
+		setBlockTextureName("sburb:" + getUnlocalizedName().substring(5));
 		setCreativeTab(CreativeTabs.tabBlock);
 	}
 }
