@@ -4,7 +4,7 @@ import net.minecraft.block.material.Material;
 import net.minecraft.block.Block;
 import net.minecraft.creativetab.CreativeTabs;
 import net.dinkyman.sburb.help.Reference;
-
+import net.dinkyman.sburb.tabs.ModTabs;
 
 public class BlockGoldDirt extends Block
 {
@@ -18,7 +18,8 @@ public class BlockGoldDirt extends Block
                 // in sburb.scala)
                 // Additionally, I have moved your texture to the sburb
                 // directory.
+		//leave nigels comment here in case i dunking forget texture shite
 		setBlockTextureName("sburb:" + getUnlocalizedName().substring(5));
-		setCreativeTab(CreativeTabs.tabBlock);
+		setCreativeTab(ModTabs.tabDreamDimensions);
 	}
 }
