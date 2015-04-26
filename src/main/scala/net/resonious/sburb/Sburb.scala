@@ -41,7 +41,8 @@ import net.resonious.sburb.blocks.GristShopItem
 import net.resonious.sburb.game.grist.GristShopItemRenderer
 import net.dinkyman.sburb.DMain
 
-@Mod(modid = "sburb", version = "0.0.0", modLanguage = "scala")
+@Mod(modid = "sburb", version = "0.0.0", modLanguage = "scala",
+  dependencies = "required-after:OpenComputers@[1.5.0,)")
 object Sburb {
 
 
