@@ -259,7 +259,7 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
     } else {
       // TODO make absolutly sure death doesn't screw this up
       After(2, 'seconds) execute {
-        if (!hasGame)
+        if (!hasGame && !SburbGame.defaultSpawn.isZero)
           player.setPositionAndUpdate(
             SburbGame.defaultSpawn.x,
             SburbGame.defaultSpawn.y,

@@ -25,6 +25,8 @@ class Vector3[T](
         y.asInstanceOf[Double], 
         z.asInstanceOf[Double])
   }
+
+  def isZero() = x == 0 && y == 0 && z == 0
   
   def foreach(f: (Symbol, T) => Unit) = {
     f('x, x); f('y, y); f('z, z)

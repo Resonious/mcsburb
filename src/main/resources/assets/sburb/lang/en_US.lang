@@ -3,7 +3,7 @@ item.test_modus.name=Test Modus
 item.build_grist.name=Build Grist
 item.amber_grist.name=Amber Grist
 
-item.sburb_disc.name=Nonfunctional Sburb Disc
+item.sburb_disc.name=Sburb Disc
 item.cruxtruder.name=Nonfunctional Cruxtruder
 tile.computer.name=Nonfunctional Computer
 tile.house_indicator.name=House Assignment Block

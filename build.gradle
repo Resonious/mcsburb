@@ -9,6 +9,9 @@ buildscript {
             name = "sonatype"
             url = "https://oss.sonatype.org/content/repositories/snapshots/"
         }
+        maven {
+            url = "http://maven.cil.li/"
+        }
     }
     dependencies {
         classpath 'net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT'
@@ -42,7 +45,7 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
     compile "com.google.code.findbugs:jsr305:2.0.1"
     compile "org.reflections:reflections:0.9.9-RC1"
-    compile files('./libs/RenderPlayerAPI-1.7.2-1.2.jar')
+    // compile files('./libs/RenderPlayerAPI-1.7.2-1.2.jar')
 }
 
 processResources
