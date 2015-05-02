@@ -1,11 +1,16 @@
-local screen = component.list('screen', true)()
-for address in component.list('screen', true) do
-  if #component.invoke(address, 'getKeyboards') > 0 then
-    screen = address
+local function getGpuAndScreen()
+  local screen = component.list('screen', true)()
+  for address in component.list('screen', true) do
+    if #component.invoke(address, 'getKeyboards') > 0 then
+      screen = address
+    end
   end
+  local gpu = component.list('gpu', true)()
+  return gpu, screen
 end
 
-local gpu = component.list('gpu', true)()
+local gpu, screen = getGpuAndScreen()
+
 local w, h, msgX, msgY, msgWidth, msgHeight
 msgWidth = 36
 msgHeight = 3
@@ -113,6 +118,8 @@ local keyW = 119
 local keyA = 97
 local keyS = 115
 local keyD = 100
+local keyC = 67
+local keyQ = 81
 local keyEnter = 13
 local keySpace = 32
 
@@ -132,6 +139,7 @@ while true do
     if char == keyEnter then
       currentPlayer = player
 
+      clear()
       title("Welcome, "..player)
 
       if sburb.playerHasGame(player) then
@@ -163,14 +171,30 @@ while true do
         if sburb.playerHasClient(player) then
           local err = sburb.toggleServerMode(player)
           if err then print(err) end
-        else
-          print('U WANT 2 WAIT')
+        elseif sburb.playerHasGame(player) then
+          local err = sburb.waitForClient(player)
+          clear()
+          if err then
+            status(err)
+            currentPlayer = nil
+          else
+            box(0, 'Waiting for a client...')
+            box(3, "Press 'q' to cancel")
+            -- TODO q doesn't do shit
+          end
         end
 
-      elseif char == keyS then
-        if not sburb.playerHasServer(player) then
-          print('i show u list... jk')
+      elseif char == keyC and not sburb.playerHasServer(player) then
+        for i, v in ipairs(sburb.listWaitingServers(player)) do
+          print(v)
+          print("and no way to select from them")
         end
+
+      elseif char == keyQ then
+        if sburb.playerHasGame(player) and not sburb.playerHasClient(player) then
+          sburb.doneWaitingForClient(player)
+        end
+
       end
 
     elseif char == keySpace then
@@ -191,5 +215,14 @@ while true do
 
   elseif name == 'clipboard' then
     computer.shutdown()
+
+  elseif name == 'component_available' then
+    cType = arg1
+    if cType == 'screen' or cType == 'gpu' then
+      gpu, screen = getGpuAndScreen()
+    end
+    -- NOTE this works but we need to make the UI system have states or something
+    -- so that the current screen can be re-rendered.
+
   end
 end
