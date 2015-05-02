@@ -24,8 +24,12 @@ import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import net.minecraft.nbt.NBTTagCompound
+import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
 
 object SburbDisc extends ActiveItem("Sburb Disc") {
+  val waitingPlayers = new HashMap[String, HashSet[String]]
+
   li.cil.oc.api.Driver.add(DriverFloppySburbDisc)
 }
 
@@ -111,6 +115,61 @@ object DriverFloppySburbDisc extends DriverItem(new ItemStack(SburbDisc)) {
       }
     }
 
+    @Callback(direct = false, limit = 1)
+    def waitForClient(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, name: String) => {
+          if (!props.hasGame)
+            return result("Player "+name+" is not in a game")
+          else if (props.gameEntry.hasClient)
+            return result("Player "+name+" already has a client!")
+
+          if (!SburbDisc.waitingPlayers.contains(props.gameId))
+            SburbDisc.waitingPlayers += props.gameId -> new HashSet[String]
+
+          SburbDisc.waitingPlayers(props.gameId) += name
+          Sburb log "Added "+name+" to waiting players for their game"
+          result(null)
+        }
+      }
+    }
+
+    @Callback(direct = false, limit = 1)
+    def doneWaitingForClient(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, name: String) => {
+          if (!props.hasGame)
+            return result("Player "+name+" is not in a game")
+
+          if (!SburbDisc.waitingPlayers.contains(props.gameId))
+            return result("Player "+name+" is not currently waiting")
+
+          SburbDisc.waitingPlayers(props.gameId) -= name
+          Sburb log "Removed "+name+" from waiting players for their game"
+          result(null)
+        }
+      }
+    }
+
+    @Callback(direct = false, limit = 1)
+    def listWaitingServers(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, name: String) => {
+          if (!props.hasGame)
+            return result("Player "+name+" is not in a game")
+
+          if (!SburbDisc.waitingPlayers.contains(props.gameId)) {
+            Sburb log "Sending empty array for waiting servers in game "+props.gameId
+            return result(Array())
+          }
+
+          result(SburbDisc.waitingPlayers(props.gameId))
+        }
+      }
+    }
   }
 
   override def slot(stack: ItemStack) = Slot.Floppy
