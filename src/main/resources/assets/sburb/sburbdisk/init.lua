@@ -48,6 +48,13 @@ local function title(msg)
     component.invoke(gpu, 'setForeground', 0xFFFFFF)
   end
 end
+local function box(yStart, msg)
+  if gpu and screen then
+    component.invoke(gpu, 'setBackground', 0x11D635)
+    component.invoke(gpu, 'fill', msgX-2, msgY + yStart, msgWidth+4, msgHeight, ' ')
+    component.invoke(gpu, 'set', msgX - 1, msgY + yStart + 1, msg)
+  end
+end
 local function clear()
   if gpu and screen then
     y = 1
@@ -112,7 +119,8 @@ local keySpace = 32
 title("Press enter to begin")
 
 -- boot address should be address of this sburb disc, right!?!?
-local sburb = computer.getBootAddress()
+local sburb = component.proxy(computer.getBootAddress())
+local currentPlayer = nil
 
 while true do
   local name, arg1, arg2, arg3, arg4, arg5 = computer.pullSignal()
@@ -121,18 +129,58 @@ while true do
     local char = arg2
     local player = arg4
 
-    -- TODO check if player has started sburb already
-    if not loaded and char == keyEnter then
-      title('Welcome, '..player)
-      load()
+    if char == keyEnter then
+      currentPlayer = player
 
-    -- NOTE test...
+      title("Welcome, "..player)
+
+      if sburb.playerHasGame(player) then
+        local curY = 0
+        if sburb.playerHasClient(player) then
+          box(curY, "Press 's' to connect to your client.")
+          curY = curY + 5
+        else
+          box(curY, "Press 's' to await client")
+          curY = curY + 5
+          -- TODO do
+        end
+        if not sburb.playerHasServer(player) then
+          box(curY, "Press 'c' to connect to a server")
+          -- TODO 'connect with a server' functionality
+          curY = curY + 5
+        end
+      else
+        -- TODO loading will happen when payer first gets a server / client
+        -- I guess...
+        if not loaded then
+          title('Welcome, '..player)
+          load()
+        end
+      end
+
+    elseif currentPlayer and player == currentPlayer then
+      if char == keyS then
+        if sburb.playerHasClient(player) then
+          local err = sburb.toggleServerMode(player)
+          if err then print(err) end
+        else
+          print('U WANT 2 WAIT')
+        end
+
+      elseif char == keyS then
+        if not sburb.playerHasServer(player) then
+          print('i show u list... jk')
+        end
+      end
+
     elseif char == keySpace then
-      local response = component.invoke(sburb, 'sburbTest', player..' is bad')
+      local response = component.invoke(computer.getBootAddress(), 'sburbTest', player..' is bad')
       status(response)
+
+
     elseif char == keyW then
-      print('---'..component.invoke(sburb, 'getLabel')..'---')
-      for key,value in pairs(component.methods(sburb)) do
+      print('---'..component.invoke(computer.getBootAddress(), 'getLabel')..'---')
+      for key,value in pairs(component.methods(computer.getBootAddress())) do
         local valueText = '---'
         if value then valueText = 'direct' else valueText = 'synchronized' end
         print(key..' - '..valueText)

@@ -1,6 +1,7 @@
 package net.resonious.sburb.game.grist
 
 import scala.collection.JavaConversions._
+import java.util.ArrayList
 import net.minecraft.util.ResourceLocation
 import net.minecraft.entity.player.EntityPlayer
 import org.lwjgl.opengl.GL11
@@ -9,11 +10,13 @@ import net.resonious.sburb.abstracts.GuiId
 import net.minecraft.client.resources.I18n
 import net.resonious.sburb.abstracts.Renderer
 import net.minecraft.client.gui.ScaledResolution
+import net.minecraft.client.gui.GuiButton
 import net.minecraft.client.gui.FontRenderer
 import net.resonious.sburb.game.SburbProperties
 import net.resonious.sburb.Sburb
 import net.minecraft.inventory.Slot
 import net.resonious.sburb.blocks.GristShopItem
+import net.resonious.sburb.packets.SburbGamePacket
 
 object GristShopHud extends Renderer {
   val gristCountBg = new ResourceLocation("sburb", "textures/gui/server_mode_hud_1.png")
@@ -48,7 +51,23 @@ class GristShopGui(plr: EntityPlayer) extends GuiContainer(new GristShopContaine
 
   private val inventory = GristShopInventory
 
+  var buttons = new ArrayList[GuiButton]
+  buttonList = buttons
+
   var topText = "Grist Shop"
+  val exitButton = 0
+
+  override def initGui():Unit = {
+    super.initGui()
+
+    buttons add new GuiButton(exitButton, guiLeft - 13, guiTop - 25, "Exit server mode")
+  }
+
+  override def actionPerformed(button: GuiButton): Unit = {
+    button.id match {
+      case exitButton => SburbGamePacket.serverMode.deactivate()
+    }
+  }
 
   override def drawScreen(par1: Int, par2: Int, par3: Float) {
     super.drawScreen(par1, par2, par3)

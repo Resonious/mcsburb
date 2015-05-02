@@ -54,4 +54,29 @@ object SburbGamePacket {
 	  }
 	}
 	val newPlayer = new NewPlayerPacket
+
+	class ServerModePacket extends ActivePacket {
+		var activated = false
+
+		@SideOnly(Side.CLIENT)
+		def deactivate() = {
+			this.activated = false
+			PacketPipeline.sendToServer(this)
+		}
+		override def write(buf: ByteBuf) = {
+			buf writeBoolean activated
+		}
+		override def read(buf: ByteBuf) = {
+			activated = buf.readBoolean
+		}
+
+		override def onServer(player: EntityPlayer) = {
+			val props = SburbProperties of player
+			if (!props.hasGame)
+				throw new SburbException("This guy doesn't even have a game")
+
+			props.serverMode.activated = activated
+		}
+	}
+	val serverMode = new ServerModePacket
 }

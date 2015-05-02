@@ -13,6 +13,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 import scala.util.Random
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import SburbGame._
 import net.minecraft.entity.player.EntityPlayer
@@ -260,6 +262,9 @@ class SburbGame(gid: String = "") extends Serializable {
   // Transient because don't serialize RNG
   @transient
   val rand = new Random
+
+  @transient
+  var currentlySaving = false
   
   private var players = new HashMap[String, PlayerEntry]
   
@@ -382,13 +387,18 @@ class SburbGame(gid: String = "") extends Serializable {
   }
   
   // Of course, save to the appropriate file
-  def save() = {
-    var fileOut = new FileOutputStream(gameId.sburb)
-    var out = new ObjectOutputStream(fileOut)
-    
-    out.writeObject(this)
-    out.close()
-    
-    Sburb log "Saved game to "+gameId.sburb
+  def save() = if (!currentlySaving) {
+    currentlySaving = true
+    Future {
+      var fileOut = new FileOutputStream(gameId.sburb)
+      var out = new ObjectOutputStream(fileOut)
+      
+      out.writeObject(this)
+      out.close()
+
+      currentlySaving = false
+      
+      Sburb log "Saved game to "+gameId.sburb
+    }
   }
 }

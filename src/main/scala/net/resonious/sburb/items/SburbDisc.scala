@@ -5,6 +5,7 @@ import net.minecraft.item.ItemStack
 import net.minecraft.world.World
 import net.resonious.sburb.abstracts
 import net.resonious.sburb.Sburb
+import net.resonious.sburb.game.SburbProperties
 import net.resonious.sburb.abstracts.ActiveItem
 import li.cil.oc.api.{FileSystem => IFileSystem}
 import li.cil.oc.api.FileSystem
@@ -15,6 +16,7 @@ import li.cil.oc.api.driver.item.Slot
 import li.cil.oc.api.network._
 import li.cil.oc.api.detail.FileSystemAPI
 import li.cil.oc.api.prefab.DriverItem
+import li.cil.oc.common.component._
 import java.io
 import li.cil.oc.server.component
 import li.cil.oc.api.fs.Label
@@ -44,14 +46,71 @@ object DriverFloppySburbDisc extends DriverItem(new ItemStack(SburbDisc)) {
     @Callback(direct = true, limit = 15, doc = """function(handle:number, whence:string, offset:number):number -- Seeks in an open file descriptor with the specified handle. Returns the new pointer position.""")
     override def seek(context: Context, args: Arguments): Array[AnyRef] = super.seek(context, args)
 
-    // @Callback(direct = true, limit = 6, doc = """function(handle:number, value:string):boolean -- Writes the specified data to an open file descriptor with the specified handle.""")
-    // override def write(context: Context, args: Arguments): Array[AnyRef] = super.write(context, args)
-
-    @Callback(direct = false, limit = 20)
+    @Callback(direct = true, limit = 20)
     def sburbTest(context: Context, args: Arguments): Array[AnyRef] = {
       Sburb log "OMG. From lua: " + args.checkString(0)
-      Array("this is it")
+      result("this is it")
     }
+
+    private def playerPropsFrom(args: Arguments) = {
+      val name = args.checkString(0)
+      val player = Sburb playerOfName name
+      if (player == null)
+        result(null, "Player " + name + " not found")
+      else
+        ((SburbProperties of player), player, name)
+    }
+
+    @Callback(direct = true, limit = 20)
+    def playerHasGame(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, _) => return result(props.hasGame)
+
+        case _ => return result(false)
+      }
+    }
+
+    @Callback(direct = true, limit = 20)
+    def playerHasClient(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, _) =>
+          if (props.hasGame) return result(props.gameEntry.hasClient)
+          else return result(false)
+          
+        case _ => return result(false)
+      }
+    }
+
+    @Callback(direct = true, limit = 20)
+    def playerHasServer(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, _) =>
+          if (props.hasGame) return result(props.gameEntry.hasServer)
+          else return result(false)
+
+        case _ => return result(false)
+      }
+    }
+
+    @Callback(direct = false, limit = 1)
+    def toggleServerMode(context: Context, args: Arguments): Array[AnyRef] = {
+      playerPropsFrom(args) match {
+        case a: Array[AnyRef] => return a
+        case (props: SburbProperties, _, name: String) =>
+          if (!props.hasGame)
+            result("Player "+name+" is not in a game")
+          else if (!props.gameEntry.hasClient)
+            result("Player "+name+" does not have a client")
+          else {
+            props.serverMode.activated = !props.serverMode.activated
+            result(null)
+          }
+      }
+    }
+
   }
 
   override def slot(stack: ItemStack) = Slot.Floppy
