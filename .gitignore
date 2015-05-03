@@ -17,6 +17,8 @@ eclipse/
 *.class
 *.log
 
+server.bat
+
 .cache
 **/.gradle
 eclipse

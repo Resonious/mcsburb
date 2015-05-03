@@ -397,8 +397,6 @@ class SburbGame(gid: String = "") extends Serializable {
       out.close()
 
       currentlySaving = false
-      
-      Sburb log "Saved game to "+gameId.sburb
     }
   }
 }

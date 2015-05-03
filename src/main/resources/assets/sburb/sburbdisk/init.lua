@@ -60,6 +60,13 @@ local function box(yStart, msg)
     component.invoke(gpu, 'set', msgX - 1, msgY + yStart + 1, msg)
   end
 end
+local function listItem(yStart, msg)
+  if gpu and screen then
+    component.invoke(gpu, 'setBackground', 0x1900FA)
+    component.invoke(gpu, 'fill', msgX-2, msgY - 3 + yStart, msgWidth+4, 1, ' ')
+    component.invoke(gpu, 'set', msgX - 1, msgY - 3 + yStart, msg)
+  end
+end
 local function clear()
   if gpu and screen then
     y = 1
@@ -118,111 +125,350 @@ local keyW = 119
 local keyA = 97
 local keyS = 115
 local keyD = 100
-local keyC = 67
-local keyQ = 81
+local keyC = 99
+local keyQ = 113
+local keyY = 121
+local keyN = 110
 local keyEnter = 13
 local keySpace = 32
+local function numOfKey(char)
+  local num = char - 48
+  if num >= 0 and num <= 9 then
+    return num
+  else
+    return nil
+  end
+end
 
-title("Press enter to begin")
+-- title("Press enter to begin")
 
 -- boot address should be address of this sburb disc, right!?!?
 local sburb = component.proxy(computer.getBootAddress())
-local currentPlayer = nil
 
-while true do
-  local name, arg1, arg2, arg3, arg4, arg5 = computer.pullSignal()
-  -- print("gave me "..name.." signal")
-  if name == 'key_down' then
-    local char = arg2
-    local player = arg4
+local testState = {
+  curPlayer = nil,
 
-    if char == keyEnter then
-      currentPlayer = player
+  open = function(self, player)
+    self.curPlayer = player
+  end,
+  close = function(self)
+  end,
 
+  render = function(self)
+    title('test!!!')
+    status('unbelievable')
+  end,
+
+  key = function(self, player, char)
+    print(player..' pressed '..char)
+  end,
+
+  touch = function(self, player, x, y, button)
+    print(player..' touched at '..x..', '..y)
+  end
+}
+
+withPlayer = function(self, player)
+  self.curPlayer = player
+  return self
+end
+
+serverListState = {
+  curPlayer = 'unknown',
+  with = withPlayer,
+  curError = nil,
+  servers = nil,
+  refreshTimer = 2,
+
+  open = function(self)
+    self.servers, self.curError = sburb.listWaitingServers(self.curPlayer)
+  end,
+
+  render = function(self)
+    if self.curError then
+      title('Error: '..self.curError)
+    elseif not self.servers then
+      title('wtf i dont even know')
+    elseif #self.servers == 0 then
+      title('No servers currently available')
+    else
+      title('Press the number corrosponding to...')
+      for i,name in ipairs(self.servers) do
+        listItem(i, i..') '..name)
+      end
+    end
+    component.invoke(gpu, 'setBackground', 0x8BAFE0)
+    print("Press 'q' to cancel")
+    -- print("also lol u cant choose yet")
+  end,
+
+  tick = function(self)
+    self.refreshTimer = self.refreshTimer - 1
+    if self.refreshTimer <= 0 then
+      self:open()
       clear()
-      title("Welcome, "..player)
+      self:render()
 
-      if sburb.playerHasGame(player) then
-        local curY = 0
-        if sburb.playerHasClient(player) then
-          box(curY, "Press 's' to connect to your client.")
-          curY = curY + 5
-        else
-          box(curY, "Press 's' to await client")
-          curY = curY + 5
-          -- TODO do
-        end
-        if not sburb.playerHasServer(player) then
-          box(curY, "Press 'c' to connect to a server")
-          -- TODO 'connect with a server' functionality
-          curY = curY + 5
-        end
+      self.refreshTimer = 2
+    end
+  end,
+
+  key = function(self, player, char)
+    if char == keyQ then
+      switchTo(menuState:with(self.curPlayer))
+    elseif self.servers and #self.servers > 0 then
+      local num = numOfKey(char)
+      if num and num > 0 and num <= #self.servers then
+        switchTo(
+          waitForServerConfirmState
+            :with(self.curPlayer)
+            :selecting(self.servers[num])
+        )
+      end
+    end
+  end
+}
+
+waitForServerConfirmState = {
+  curPlayer = 'unknown',
+  choice = 'unknown',
+  curError = nil,
+
+  with = withPlayer,
+  selecting = function(self, choice)
+    self.choice = choice
+    return self
+  end,
+
+  open = function(self)
+    self.curError = sburb.selectServer(self.curPlayer, self.choice)
+  end,
+  close = function(self)
+    sburb.cancelSelection(self.curPlayer)
+  end,
+
+  render = function(self)
+    if self.curError then
+      title('error: '..self.curError)
+    else
+      title('Waiting for '..self.choice..'...')
+      status("Press 'q' to cancel")
+    end
+  end,
+
+  tick = function(self)
+    if sburb.playerHasServer(self.curPlayer) then
+      switchTo(menuState:with(self.curPlayer))
+    else
+      local hit, candidate = sburb.checkIfSelected(self.choice)
+      if not hit or candidate ~= self.curPlayer then
+        switchTo(serverListState:with(self.curPlayer))
+      end
+    end
+  end,
+
+  key = function(self, player, char)
+    if char == keyQ then
+      switchTo(serverListState:with(self.curPlayer))
+    end
+  end
+}
+
+waitForClientState = {
+  curPlayer = 'unknown',
+  curError = nil,
+  candidate = nil,
+
+  open = function(self)
+    self.curError = sburb.waitForClient(self.curPlayer)
+  end,
+  close = function(self)
+    sburb.doneWaitingForClient(self.curPlayer)
+  end,
+
+  with = withPlayer,
+
+  render = function(self)
+    local boxY = 0
+    if self.curError then
+      title('Error: '..self.curError)
+
+    elseif self.candidate then
+      title('Accept '..self.candidate..' as client?')
+      box(boxY, "'y' to accept, 'n' to reject")
+      boxY = boxY + 4
+
+    else
+      title('Waiting for client connection...')
+    end
+
+    box(boxY, "Press 'q' to cancel.")
+  end,
+
+  tick = function(self)
+    local hit, candidate = sburb.checkIfSelected(self.curPlayer)
+    if hit then
+      if candidate ~= self.candidate then
+        self.candidate = candidate
+        clear()
+        self:render()
+      end
+
+    elseif self.candidate then
+      self.candidate = nil
+      clear()
+      self:render()
+
+    end
+    if hit and not candidate then
+      self.curError = hit
+      clear()
+      self:render()
+    end
+  end,
+
+  key = function(self, player, char)
+    if char == keyQ then
+      switchTo(menuState:with(self.curPlayer))
+
+    elseif self.candidate then
+      if char == keyY then
+        sburb.appointServer(self.candidate, self.curPlayer)
+        switchTo(menuState:with(self.curPlayer))
+      elseif char == keyN then
+        sburb.cancelSelection(self.candidate)
+        self.candidate = nil
+        clear()
+        self:render()
+      end
+    else
+      self:render()
+    end
+  end
+}
+
+menuState = {
+  curPlayer = 'unknown',
+
+  with = withPlayer,
+
+  render = function(self)
+    title('Welcome, '..self.curPlayer)
+    
+    component.invoke(gpu, 'setBackground', 0x8BAFE0)
+    print("Press 'q' to sign out")
+    local serverName = sburb.serverPlayerOf(self.curPlayer)
+    if serverName then print('Server: '..serverName) end
+    local clientName = sburb.clientPlayerOf(self.curPlayer)
+    if clientName then print('Client: '..clientName) end
+
+    if sburb.playerHasGame(self.curPlayer) then
+      local curY = 0
+      if sburb.playerHasClient(self.curPlayer) then
+        box(curY, "Press 's' to connect to your client.")
+        curY = curY + 5
       else
-        -- TODO loading will happen when payer first gets a server / client
-        -- I guess...
-        if not loaded then
-          title('Welcome, '..player)
-          load()
-        end
+        box(curY, "Press 's' to await client")
+        curY = curY + 5
+      end
+      if not sburb.playerHasServer(self.curPlayer) then
+        box(curY, "Press 'c' to connect to a server")
+        curY = curY + 5
       end
 
-    elseif currentPlayer and player == currentPlayer then
-      if char == keyS then
-        if sburb.playerHasClient(player) then
-          local err = sburb.toggleServerMode(player)
-          if err then print(err) end
-        elseif sburb.playerHasGame(player) then
-          local err = sburb.waitForClient(player)
-          clear()
-          if err then
-            status(err)
-            currentPlayer = nil
-          else
-            box(0, 'Waiting for a client...')
-            box(3, "Press 'q' to cancel")
-            -- TODO q doesn't do shit
-          end
-        end
+    else
+      status("You ain't even playin'...")
+    end
+  end,
 
-      elseif char == keyC and not sburb.playerHasServer(player) then
-        for i, v in ipairs(sburb.listWaitingServers(player)) do
-          print(v)
-          print("and no way to select from them")
-        end
+  key = function(self, player, char)
+    if char == keyQ then
+      self.curPlayer = 'unknown'
+      switchTo(loginState)
+      return
+    end
 
-      elseif char == keyQ then
-        if sburb.playerHasGame(player) and not sburb.playerHasClient(player) then
-          sburb.doneWaitingForClient(player)
-        end
+    if player ~= self.curPlayer then return end
+    if not sburb.playerHasGame(player) then return end
 
+    if char == keyS then
+      if sburb.playerHasClient(player) then
+        local err = sburb.toggleServerMode(player)
+        if err then print(err) end
+
+      else
+        switchTo(waitForClientState:with(player))
       end
+
+    elseif char == keyC then
+      if not sburb.playerHasServer(player) then
+        switchTo(serverListState:with(player))
+      end
+
+    else
+      clear()
+      self:render()
+    end
+  end,
+
+  touch = function(self, player, x, y, button)
+    self:render()
+  end
+}
+
+loginState = {
+  render = function(self)
+    title('Press enter to begin')
+  end,
+
+  key = function(self, player, char)
+    if char == keyEnter then
+      sburb.clearStateFor(player)
+      switchTo(menuState:with(player))
 
     elseif char == keySpace then
-      local response = component.invoke(computer.getBootAddress(), 'sburbTest', player..' is bad')
-      status(response)
+      switchTo(testState)
+    end
+  end,
 
+  touch = function(self, player, x, y, button)
+    self:render()
+  end
+}
 
-    elseif char == keyW then
-      print('---'..component.invoke(computer.getBootAddress(), 'getLabel')..'---')
-      for key,value in pairs(component.methods(computer.getBootAddress())) do
-        local valueText = '---'
-        if value then valueText = 'direct' else valueText = 'synchronized' end
-        print(key..' - '..valueText)
-      end
+local currentState = {}
+function switchTo(state, player)
+  if currentState.close then currentState:close() end
+  clear()
+  currentState = state
+  if state.open then state:open(player) end
+  if state.render then state:render() end
+end
+
+switchTo(loginState)
+
+while true do
+  local name, arg1, arg2, arg3, arg4, arg5 = computer.pullSignal(1)
+
+  if name == nil then
+    if currentState.tick then
+      currentState:tick()
     end
 
-    -- status("pressed "..char)
+  elseif name == 'key_down' then
+    if currentState.key then
+      currentState:key(arg4, arg2)
+    end
 
-  elseif name == 'clipboard' then
-    computer.shutdown()
+  elseif name == 'touch' then
+    if currentState.touch then
+      currentState:touch(arg5, arg2, arg3, arg4)
+    end
 
-  elseif name == 'component_available' then
-    cType = arg1
-    if cType == 'screen' or cType == 'gpu' then
+  elseif name == 'component_added' then
+    if arg1 == 'screen' or arg1 == 'gpu' then
       gpu, screen = getGpuAndScreen()
+      if currentState.render then currentState:render() end
     end
-    -- NOTE this works but we need to make the UI system have states or something
-    -- so that the current screen can be re-rendered.
-
   end
 end
