@@ -5,6 +5,7 @@ import cpw.mods.fml.common.eventhandler.Event.Result
 import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent
 import cpw.mods.fml.common.gameevent.TickEvent
+import cpw.mods.fml.common.gameevent.PlayerEvent
 import cpw.mods.fml.relauncher.SideOnly
 import cpw.mods.fml.relauncher.Side
 import net.minecraft.client.Minecraft
@@ -20,6 +21,7 @@ import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.game.SburbProperties
 import net.resonious.sburb.game.grist.Grist._
 import net.resonious.sburb.game.grist._
+import net.resonious.sburb.items.SburbDisc
 import net.minecraft.block.Block
 import net.resonious.sburb.game.After
 import net.resonious.sburb.packets.ActivePacket
@@ -252,6 +254,11 @@ object FmlEvents {
 	  }
 	}
 
+  @SideOnly(Side.SERVER)
+  @SubscribeEvent
+  def onLogout(event: PlayerEvent.PlayerLoggedOutEvent) = {
+    SburbDisc.playerLoggedOut(event.player)
+  }
 }
 class TestPacket extends ActivePacket {
   var msg = ""

@@ -287,7 +287,7 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
   // Overrides
   override def saveNBTData(comp: NBTTagCompound):Unit = {
     comp.setString("gameId", _gameId)
-    Sburb log "SAVED GAME ID OF " + _gameId
+    // Sburb log "SAVED GAME ID OF " + _gameId
     serverMode save comp
   }
 
