@@ -20,8 +20,8 @@ import org.objectweb.asm.tree.MethodNode;
 
 public abstract class SburbTransformer implements IClassTransformer {
 	public static void print(Object o) {
-		System.out.print("************************************");
-		System.out.print(o);
+		System.out.println("************************************");
+		System.out.println(o);
 		System.out.println("************************************");
 	}
 	
@@ -38,8 +38,13 @@ public abstract class SburbTransformer implements IClassTransformer {
 		
 		protected void inMethod(String unobfName, String obfName, String desc, InMethod callback) {
 			Iterator<MethodNode> methods = classNode.methods.iterator();
+			boolean found = false;
+
 			while(methods.hasNext()) {
 				MethodNode m = methods.next();
+
+				// print("Found method of name "+m.name+" and descriptor "+m.desc);
+
 				if (m.name.equals(unobfName) || m.name.equals(obfName) 
 						&& (desc == null || m.desc.equals(desc.replace("$", "")))) {
 					print("INSIDE METHOD "+m.name);
@@ -47,7 +52,12 @@ public abstract class SburbTransformer implements IClassTransformer {
 					callback.prepare(m);
 					callback.within();
 					curMethodNode = null;
+					found = true;
 				}
+			}
+
+			if (!found) {
+				throw new RuntimeException("Failed to find method "+unobfName+" ("+obfName+")");
 			}
 		}
 		protected void inMethod(String unobfName, String obfName, InMethod callback) {

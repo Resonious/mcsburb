@@ -1,6 +1,7 @@
 package net.resonious.sburb.abstracts
 
 import net.minecraft.entity.player.EntityPlayer
+import net.minecraft.util.Vec3
 
 object Vector3 {
   implicit class IntTuple2Vec3(t: (Int,Int,Int)) {
@@ -8,10 +9,7 @@ object Vector3 {
   }
 }
 
-class Vector3[T](
-  var x:T=0,
-  var y:T=0,
-  var z:T=0) extends Serializable {
+class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {
   def this(xyz: (T,T,T)) = this(xyz._1,xyz._2,xyz._3)
   def this(xyz: Array[T]) = this(xyz(0), xyz(1), xyz(2))
   def this(p: EntityPlayer) = this(
@@ -52,6 +50,13 @@ class Vector3[T](
       case 'x => x
       case 'y => y
       case 'z => z
+    }
+  }
+  def apply(i: Int) = {
+    i match {
+      case 0 => x
+      case 1 => y
+      case 2 => z
     }
   }
   def update(s:Symbol, value:T) = {

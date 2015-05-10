@@ -132,7 +132,7 @@ object ForgeEvents {
         val block = world.getBlock(event.x, event.y, event.z)
         val meta = world.getBlockMetadata(event.x, event.y, event.z)
         val cost = if ((GristShopItem of block) == null)
-            blockHardness.get(block).asInstanceOf[Float].ceil.toInt
+            blockHardness.get(block).asInstanceOf[Float].ceil.toInt * 2
           else 0
 
         if (cost < 0 || clientsGrist < cost) {
@@ -227,8 +227,12 @@ object FmlEvents {
     def thing() = println("base!")
   }
 
+  // Server:
   @SubscribeEvent
-  def onTick(event: TickEvent.ServerTickEvent) = After.tick()
+  def onTick(event: TickEvent.ServerTickEvent) = {
+    After.tick()
+  }
+  // Client:
   @SubscribeEvent
   def onTick(event: TickEvent.ClientTickEvent) = After.tick()
 
