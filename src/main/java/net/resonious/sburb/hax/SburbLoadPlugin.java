@@ -11,7 +11,10 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
 public class SburbLoadPlugin implements IFMLLoadingPlugin, IFMLCallHook {
 	@Override
 	public String[] getASMTransformerClass() {
-		return new String[] {"net.resonious.sburb.hax.transformers.CollisionTransformer"};
+		return new String[] {
+			"net.resonious.sburb.hax.transformers.CollisionTransformer",
+			"net.resonious.sburb.hax.transformers.NBTTransformer"
+		};
 	}
 	@Override
 	public String getModContainerClass() {

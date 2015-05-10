@@ -201,6 +201,7 @@ object Sburb {
   @EventHandler
   def onServerStart(event: FMLServerStartingEvent): Unit = {
     event.registerServerCommand(SburbCommand)
+    event.registerServerCommand(StructCommand)
 
     // Load Sburb games if server
     if (isClient) return

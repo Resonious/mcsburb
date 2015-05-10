@@ -61,7 +61,9 @@ object SburbCommand extends ActiveCommand {
   	    Sburb.playerOfName(args(index)) 
 	}
 
-	override def canCommandSenderUseCommand(sender: ICommandSender) = true
+	override def canCommandSenderUseCommand(sender: ICommandSender) = {
+    false
+  }
 
 	override def addTabCompletionOptions(sender: ICommandSender, args: Array[String]) = {
 		null
@@ -178,7 +180,7 @@ object SburbCommand extends ActiveCommand {
 	  props.game = null
 	  player chat "Cleared Sburb game data for "+plr.getDisplayName+"!"
 	}
-	
+
 	class TestPacket extends ActivePacket {
 	  override def read(b:ByteBuf) = Sburb log "READING"
 	  override def write(b:ByteBuf) = Sburb log "WRITING"
