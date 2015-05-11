@@ -9,6 +9,12 @@ import java.io.ObjectOutputStream
 import java.lang.reflect.Field
 import java.util.Scanner
 
+import net.resonious.sburb.abstracts.PacketPipeline
+import net.minecraftforge.common.DimensionManager
+import io.netty.buffer.ByteBuf
+import cpw.mods.fml.relauncher.SideOnly
+import cpw.mods.fml.relauncher.Side
+import cpw.mods.fml.common.network.ByteBufUtils
 import net.minecraft.world.World
 import net.resonious.sburb.abstracts.ActiveCommand
 import net.resonious.sburb.commands.SburbCommand.PlayerWithChat
@@ -32,12 +38,54 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.io.DataInput
 import java.io.DataOutput
+import net.resonious.sburb.packets.ActivePacket
 
 object Structure {
+  // This object is used in conjunction with the NBTTransformer to
+  // circumvent Minecraft's anti-ddos limitations on NBT compound/lists
   object LameSizeTracker extends NBTSizeTracker(0) {
     // public void func_152450_a(long p_152450_1_)
     override def func_152450_a(p: Long): Unit = {}
   }
+
+  // Packet sent from server to client when a structure is generated.
+  class UpdateClientsPacket extends ActivePacket {
+    var structComp: NBTTagCompound = null
+    var x: Int = -1
+    var y: Int = -1
+    var z: Int = -1
+
+    @SideOnly(Side.SERVER)
+    def send(world: World, struct: Structure, x: Int, y: Int, z: Int) = {
+      this.x = x
+      this.y = y
+      this.z = z
+      this.structComp = struct.toTagComp
+      
+      PacketPipeline.sendToDimension(this, world.provider.dimensionId)
+    }
+
+    override def write(buffer: ByteBuf) = {
+      buffer.writeInt(x)
+      buffer.writeInt(y)
+      buffer.writeInt(z)
+      ByteBufUtils.writeTag(buffer, structComp)
+    }
+
+    override def read(buffer: ByteBuf) = {
+      this.x = buffer.readInt
+      this.y = buffer.readInt
+      this.z = buffer.readInt
+      this.structComp = ByteBufUtils.readTag(buffer)
+    }
+
+    override def onClient(player: EntityPlayer): Unit =
+      Structure.fromTagComp(structComp).placeAt(player.worldObj, x, y, z)
+  }
+  val updateClientsPacket = new UpdateClientsPacket
+
+
+  // ========== Hacking internal nbt method accessibility ============
 
   val nbtWrite = try {
     classOf[NBTTagCompound].getDeclaredMethod("func_74734_a", classOf[DataOutput])
@@ -55,6 +103,8 @@ object Structure {
     }
   nbtLoad.setAccessible(true)
 
+
+  // ========== Utility methods for block things ===========
 
   def serializeBlock(world: World, x: Int, y: Int, z: Int, blacklist: Map[String, Symbol]): Option[(NBTTagCompound, String)] = {
     val tagComp = new NBTTagCompound
@@ -113,18 +163,23 @@ object Structure {
   }
 
 
-  def load(fileName: String): Structure = {
-    var struct = new Structure(null, (0,0,0), (0,0,0), null)
+  // =========== Pseudo-constructors for Structure class. Kind of awkward but whatever ==============
 
+  def fromTagComp(comp: NBTTagCompound) = {
+    var struct = new Structure(null, (0,0,0), (0,0,0), null)
+    struct.round1 = comp.getTag("round1").asInstanceOf[NBTTagList]
+    struct.round2 = comp.getTag("round2").asInstanceOf[NBTTagList]
+    struct
+  }
+
+  def load(fileName: String): Structure = {
     var fileIn = new FileInputStream(fileName)
     var in = new ObjectInputStream(fileIn)
 
     var fileTag = new NBTTagCompound
     nbtLoad.invoke(fileTag, in, 0.asInstanceOf[java.lang.Object], LameSizeTracker)
 
-    struct.round1 = fileTag.getTag("round1").asInstanceOf[NBTTagList]
-    struct.round2 = fileTag.getTag("round2").asInstanceOf[NBTTagList]
-    struct
+    fromTagComp(fileTag)
   }
 
 }
@@ -140,6 +195,8 @@ class Structure(
   // Round 2 contains stuff that might fall, like torches
   var round2 = new NBTTagList
 
+  // Here lies the "real" constructor logic for this class. I'd refactor it, but
+  // why fix what's not broken at this point.
   if (world != null) {
 
     val min = new Vector3
@@ -175,12 +232,15 @@ class Structure(
           tagComp.setInteger("relY", relY)
           tagComp.setInteger("relZ", relZ)
 
+          // Remember, stuff that might fall or depend on other blocks go last (round2)
           if (
             (blockName contains "torch")   ||
             (blockName contains "water")   ||
             (blockName contains "lava")    ||
             (blockName contains "sapling") ||
-            (blockName contains "sand")
+            (blockName contains "sand")    ||
+            (blockName contains "reeds")   ||
+            (blockName contains "flower")
           )
             round2 appendTag tagComp
           else
@@ -203,19 +263,28 @@ class Structure(
       )
     }
 
+    if (Sburb.isServer)
+      Structure.updateClientsPacket.send(world, this, x, y, z)
+
     for (i <- 0 until round1.tagCount) place(round1, i)
     for (i <- 0 until round2.tagCount) place(round2, i)
   }
+
+  def toTagComp(additionalInfo: NBTTagCompound => Unit): NBTTagCompound = {
+    var comp = new NBTTagCompound
+    comp.setTag("round1", round1)
+    comp.setTag("round2", round2)
+    if (additionalInfo != null)
+      additionalInfo(comp)
+    comp
+  }
+  def toTagComp(): NBTTagCompound = toTagComp(null)
 
   def saveToFile(fileName: String) = {
     var fileOut = new FileOutputStream(fileName)
     var out = new ObjectOutputStream(fileOut)
 
-    var fileTag = new NBTTagCompound
-    fileTag.setTag("round1", round1)
-    fileTag.setTag("round2", round2)
-
-    Structure.nbtWrite.invoke(fileTag, out)
+    Structure.nbtWrite.invoke(toTagComp, out)
 
     out.close()
   }
