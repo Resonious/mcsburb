@@ -10,6 +10,7 @@ import org.lwjgl.input.Keyboard
 import SburbServerMode._
 import cpw.mods.fml.relauncher.SideOnly
 import io.netty.buffer.ByteBuf
+import cpw.mods.fml.common.network.ByteBufUtils
 import net.minecraft.entity.Entity
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
