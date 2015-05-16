@@ -352,7 +352,7 @@ class SburbServerMode(props: SburbProperties = null) {
   }
 
   def onJoin() = {
-    if (Sburb.isServer) {
+    if (Sburb.isServer && !player.capabilities.isCreativeMode) {
       // The reason we check that the player is in a game, is because when
       // the server deletes a game file, the player will join without knowing
       // that the game data is gone - this will clean up the game before
