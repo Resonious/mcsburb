@@ -16,6 +16,7 @@ class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {
       p.posX.asInstanceOf[T],
       p.posY.asInstanceOf[T],
       p.posZ.asInstanceOf[T])
+  def this(v: Vector3[T]) = this(v.x, v.y, v.z)
       
   def applyTo(p: EntityPlayer) = {
     p.setPositionAndUpdate(
@@ -59,6 +60,13 @@ class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {
       case 2 => z
     }
   }
+
+  def instead(f: (Vector3[T]) => Unit): Vector3[T] = {
+    var v = new Vector3[T](this)
+    f(v)
+    v
+  }
+
   def update(s:Symbol, value:T) = {
     set(s, value)
   }

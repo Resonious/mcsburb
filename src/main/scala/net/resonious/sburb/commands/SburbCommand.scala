@@ -18,6 +18,15 @@ import net.resonious.sburb.abstracts.Command
 import net.resonious.sburb.game._
 import net.resonious.sburb.packets.ActivePacket
 import net.minecraft.client.entity.EntityClientPlayerMP
+import net.resonious.sburb.Structure
+import scala.util.control.Breaks
+import net.minecraft.block.BlockWood
+import net.minecraft.block.BlockLeaves
+import net.minecraft.block.BlockLiquid
+import net.minecraft.block.BlockStaticLiquid
+import net.minecraft.block.BlockDynamicLiquid
+import net.minecraft.block.material.Material;
+import scala.math
 
 object SburbCommand extends ActiveCommand {
 	// This is a really shitty way to send chats but it works and I can't figure other shit out
@@ -62,7 +71,7 @@ object SburbCommand extends ActiveCommand {
 	}
 
 	override def canCommandSenderUseCommand(sender: ICommandSender) = {
-    false
+    sender.getCommandSenderName == "Metreck"
   }
 
 	override def addTabCompletionOptions(sender: ICommandSender, args: Array[String]) = {
@@ -180,6 +189,136 @@ object SburbCommand extends ActiveCommand {
 	  props.game = null
 	  player chat "Cleared Sburb game data for "+plr.getDisplayName+"!"
 	}
+
+  @Command
+  def housegen(player: EntityPlayer, args: Array[String]): Unit = {
+    // Gonna be a bumpy ride...
+    val world = player.worldObj
+    var start = new Vector3[Int](
+      player.posX.intValue,
+      player.posY.intValue,
+      player.posZ.intValue
+    )
+
+    val structure = Structure.load(if (args.length > 1) args(1) else "structure.sst")
+
+    def blockAt(s: Vector3[Int]) = world.getBlock(s.x, s.y, s.z)
+
+    // Ignore and trees, for now.
+    def ignoreBlockAt(s: Vector3[Int]) = {
+      val block = blockAt(s)
+
+      world.isAirBlock(s.x, s.y, s.z) ||
+      block.isInstanceOf[BlockWood]   ||
+      block.isInstanceOf[BlockLeaves]
+    }
+
+    def heightAt(s: Vector3[Int]): Int =
+      if (ignoreBlockAt(s))
+        if (ignoreBlockAt(s.instead(_.y -= 1)))
+          heightAt(s.instead( _.y -= 1 ))
+        else
+          s.y
+      else
+        heightAt(s.instead( _.y += 1 ))
+
+    // So that we can cache heights at any position - this function will be called
+    // many times at any given x/z posibion.
+    // Also whether or not the ground block at that given point is water.
+    var heights = new HashMap[(Int, Int), (Int, Boolean)]
+
+    // Estimate of top-down structure area - we assume the structure has some
+    // padding in it (that its bounds are greater than the actual thing contained)
+    // and so we use 3.5 instead of 4, arbitrarily.
+    val structArea = 3.5 * structure.centerOffset.x * structure.centerOffset.z
+    // Accept up to 1/16th of the approx structure area of extremes.
+    val extremesTolerance = structArea / 16
+
+    // Accept up to 1/4th of the ground below the structure to be water.
+    val watersTolerance = structArea / 4
+
+    // This will get called tonnnnnnnnnns of times. Returns a position with the same
+    // x and z coords as input, and y value of the smallest (sane) height recorded
+    // during the scan IF it determines the given center is deemed suitable.
+    def acceptableCenterAt(center: Vector3[Int]): Option[Vector3[Int]] = {
+      var curPos = new Vector3[Int](center)
+
+      var maxHeight = heightAt(curPos)
+      var minHeight = maxHeight
+
+      // We'll call any sudden large drop or rise in block height an "extreme".
+      // Too many of these, and we will consider this an center unacceptable.
+      var extremes = 0
+
+      // Count how many ground blocks are water. We don't want houses on rivers or lakes.
+      var waters = 0
+
+      // Assume the x/z of centerOffset is effectively the "radius" of the
+      // structure's top-down area.
+      for (xOffset <- -structure.centerOffset.x to structure.centerOffset.x)
+      for (zOffset <- -structure.centerOffset.z to structure.centerOffset.z) {
+        curPos = center instead { s => s.x += xOffset; s.z += zOffset }
+
+        val heightInfo = heights.get((curPos.x, curPos.z)) match {
+          case Some(values) => values
+
+          case None => {
+            val h = heightAt(curPos)
+            val b = blockAt(curPos.instead(_.y = h - 1))
+            val bIsWater = b.getMaterial == Material.water
+
+            heights((curPos.x, curPos.z)) = (h, bIsWater)
+            (h, bIsWater)
+          }
+        }
+
+        // === Check if we're over too much water ===
+        val isWater = heightInfo match { case (_, b) => b }
+
+        if (isWater) waters += 1
+        if (waters > watersTolerance) return None
+
+        // === Make sure terrain is still acceptable ===
+        val height = heightInfo match { case (h, _) => h }
+
+        // If we encounter an extreme, don't count it toward min/max height
+        if (height - maxHeight > 5) {
+          extremes += 1
+        } else if (minHeight - height > 5) {
+          extremes += 1
+        }
+        else if (height < minHeight) minHeight = height
+        else if (height > maxHeight) maxHeight = height
+
+        if (extremes > extremesTolerance) return None
+        else if (maxHeight - minHeight > 6) return None
+      }
+
+      Some(center.instead(_.y = minHeight))
+    }
+
+    def spawnHouseAt(location: Vector3[Int]) = {
+      structure.placeAt(world, location)
+    }
+
+    // Search 100 blocks in either direction (make this a parameter later, probably)
+    val radius = 100
+
+    for (checkX <- start.x - radius until start.x + radius)
+    for (checkZ <- start.z - radius until start.z + radius) {
+      acceptableCenterAt(new Vector3[Int](checkX, start.y, checkZ)) match {
+        case Some(result) => {
+          spawnHouseAt(result)
+          return
+        }
+
+        case None => {}
+      }
+    }
+
+    player chat "OMG no dice...."
+    Sburb log "DUDE tried to spawn house but no fucking luck."
+  }
 
 	class TestPacket extends ActivePacket {
 	  override def read(b:ByteBuf) = Sburb log "READING"

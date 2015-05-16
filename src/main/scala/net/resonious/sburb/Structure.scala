@@ -70,6 +70,9 @@ object Structure {
       buffer.writeInt(y)
       buffer.writeInt(z)
       ByteBufUtils.writeTag(buffer, structComp)
+
+      if (structComp == null)
+        throw new SburbException("Ended up writing null structure tag compound to packet")
     }
 
     override def read(buffer: ByteBuf) = {
@@ -79,8 +82,9 @@ object Structure {
       this.structComp = ByteBufUtils.readTag(buffer)
     }
 
-    override def onClient(player: EntityPlayer): Unit =
+    override def onClient(player: EntityPlayer): Unit = {
       Structure.fromTagComp(structComp).placeAt(player.worldObj, x, y, z)
+    }
   }
   val updateClientsPacket = new UpdateClientsPacket
 
@@ -112,7 +116,7 @@ object Structure {
     val block = world.getBlock(x, y, z)
     val blockName = Block.blockRegistry.getNameForObject(block)
 
-    if (blacklist contains blockName.replace("m:", "minecraft:")) {
+    if (blacklist contains blockName) {
       blacklist(blockName) match {
         case 'air => {
           tagComp.setString("blockName", "minecraft:air")
@@ -128,7 +132,7 @@ object Structure {
     val meta = world.getBlockMetadata(x, y, z)
     val tileEntity = world.getTileEntity(x, y, z)
 
-    tagComp.setString("blockName", Block.blockRegistry.getNameForObject(block))
+    tagComp.setString("blockName", blockName)
     tagComp.setInteger("blockMeta", meta)
     if (tileEntity != null) {
       val teSave = new NBTTagCompound
@@ -167,8 +171,15 @@ object Structure {
 
   def fromTagComp(comp: NBTTagCompound) = {
     var struct = new Structure(null, (0,0,0), (0,0,0), null)
+    if (comp == null)
+      throw new SburbException("Trying to load structure from null tag compound!")
+    if (!comp.hasKey("round1"))
+      throw new SburbException("Structure loading: Bad tag compound: "+comp.toString)
     struct.round1 = comp.getTag("round1").asInstanceOf[NBTTagList]
     struct.round2 = comp.getTag("round2").asInstanceOf[NBTTagList]
+    struct.centerOffset.x = comp.getInteger("centerOffsetX")
+    struct.centerOffset.y = comp.getInteger("centerOffsetY")
+    struct.centerOffset.z = comp.getInteger("centerOffsetZ")
     struct
   }
 
@@ -195,6 +206,10 @@ class Structure(
   // Round 2 contains stuff that might fall, like torches
   var round2 = new NBTTagList
 
+  // Keep track of this so that spawn coordinates can corrospond to the center
+  // of the structure.
+  var centerOffset = new Vector3[Int]
+
   // Here lies the "real" constructor logic for this class. I'd refactor it, but
   // why fix what's not broken at this point.
   if (world != null) {
@@ -217,6 +232,9 @@ class Structure(
         max(s) = v2
       }
     }
+
+    centerOffset.x = (max.x - min.x) / 2
+    centerOffset.z = (max.z - min.z) / 2
 
     // Grab EVERY BLOCK.
     for (x <- min.x to max.x)
@@ -252,14 +270,14 @@ class Structure(
     }
   }
 
-  // x,y,z starting at bottom corner
-  def placeAt(world: World, x: Int, y: Int, z: Int) = {
+  // x and z are the center of the structure's top-down defining area, y is the bottom of the structure.
+  def placeAt(world: World, x: Int, y: Int, z: Int): Unit = {
     def place(blocks: NBTTagList, i: Int) = {
       val comp = blocks.getCompoundTagAt(i)
       Structure.placeBlock(comp, world,
-        x + comp.getInteger("relX"),
-        y + comp.getInteger("relY"),
-        z + comp.getInteger("relZ")
+        x + comp.getInteger("relX") - centerOffset.x,
+        y + comp.getInteger("relY") - centerOffset.y,
+        z + comp.getInteger("relZ") - centerOffset.z
       )
     }
 
@@ -270,15 +288,22 @@ class Structure(
     for (i <- 0 until round2.tagCount) place(round2, i)
   }
 
+  def placeAt(world: World, s: Vector3[Int]): Unit = {
+    placeAt(world, s.x, s.y, s.z)
+  }
+
   def toTagComp(additionalInfo: NBTTagCompound => Unit): NBTTagCompound = {
     var comp = new NBTTagCompound
     comp.setTag("round1", round1)
     comp.setTag("round2", round2)
+    comp.setInteger("centerOffsetX", centerOffset.x)
+    comp.setInteger("centerOffsetY", centerOffset.y)
+    comp.setInteger("centerOffsetZ", centerOffset.z)
     if (additionalInfo != null)
       additionalInfo(comp)
-    comp
+    return comp
   }
-  def toTagComp(): NBTTagCompound = toTagComp(null)
+  def toTagComp(): NBTTagCompound = return toTagComp(null)
 
   def saveToFile(fileName: String) = {
     var fileOut = new FileOutputStream(fileName)

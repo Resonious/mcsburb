@@ -12,7 +12,8 @@ public class SburbLoadPlugin implements IFMLLoadingPlugin, IFMLCallHook {
 	@Override
 	public String[] getASMTransformerClass() {
 		return new String[] {
-			"net.resonious.sburb.hax.transformers.CollisionTransformer",
+			// TODO look into this if you still care...
+			// "net.resonious.sburb.hax.transformers.CollisionTransformer",
 			"net.resonious.sburb.hax.transformers.NBTTransformer"
 		};
 	}

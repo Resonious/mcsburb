@@ -16,6 +16,7 @@ import net.minecraft.util.RegistrySimple
 import net.minecraft.util.ObjectIntIdentityMap
 import scala.collection.JavaConversions._
 import scala.collection.mutable.HashMap
+import scala.math
 
 object StructCommand extends ActiveCommand {
   val underlyingIntegerMap = try {
@@ -175,10 +176,10 @@ object StructCommand extends ActiveCommand {
     args foreach { arg: String =>
       arg.split('~') match {
         case Array(blockName, blType) =>
-          blacklist += blockName -> Symbol(blType)
+          blacklist += blockName.replace("m:", "minecraft:") -> Symbol(blType)
 
         case Array(blockName) =>
-          blacklist += blockName -> 'ignore
+          blacklist += blockName.replace("m:", "minecraft:") -> 'ignore
       }
     }
 
@@ -224,6 +225,29 @@ object StructCommand extends ActiveCommand {
     player chat "Loaded structure from "+fileName
   }
 
+  def setground(player: EntityPlayer): Unit = {
+    val name = player.getCommandSenderName
+    if (!(states contains name)) {
+      player chat "Plz grab first"
+      return
+    }
+
+    val state = states(name)
+    if (state.lastStruct == null) {
+      player chat "You currently have no structure."
+      return
+    }
+
+    val captureY = state.corner1 match {
+      case (_, y1, _) => state.corner2 match {
+        case (_, y2, _) => math.min(y1, y2)
+      }
+    }
+    state.lastStruct.centerOffset.y = player.posY.intValue - captureY
+
+    player chat "Set center offset y value to " + state.lastStruct.centerOffset.y
+  }
+
   override def processCommand(sender: ICommandSender, args: Array[String]): Unit = {
     sender match {
       case player: EntityPlayer => {
@@ -238,6 +262,8 @@ object StructCommand extends ActiveCommand {
             save(player, if (args.length > 1) args(1) else "structure.sst")
           else if (args(0) equalsIgnoreCase "load")
             load(player, if (args.length > 1) args(1) else "structure.sst")
+          else if (args(0) equalsIgnoreCase "setground")
+            setground(player)
           else
             player chat "Dunno what you mean by "+args(0)
         else
