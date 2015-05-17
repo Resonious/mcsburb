@@ -99,7 +99,7 @@ class HouseIndicatorGui(bx:Int, by:Int, bz:Int) extends GuiScreen {
   	  } else
   	  	Random.nextInt(button.id)
   	  
-  	  SburbGamePacket.newPlayer send houseId
+  	  // SburbGamePacket.newPlayer send houseId
 	  }
 	}
 	

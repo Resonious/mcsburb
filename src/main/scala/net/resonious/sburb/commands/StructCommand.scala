@@ -187,7 +187,8 @@ object StructCommand extends ActiveCommand {
       state.lastStruct = new Structure(
         player.worldObj,
         state.corner1, state.corner2,
-        blacklist
+        blacklist,
+        false // Don't assume this structure will be loaded in the same server world
       )
       state.gotCorner1 = false
       state.gotCorner2 = false

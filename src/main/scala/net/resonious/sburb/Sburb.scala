@@ -202,6 +202,7 @@ object Sburb {
   def onServerStart(event: FMLServerStartingEvent): Unit = {
     event.registerServerCommand(SburbCommand)
     event.registerServerCommand(StructCommand)
+    event.registerServerCommand(HomestuckCommand)
 
     // Load Sburb games if server
     if (isClient) return
@@ -217,6 +218,6 @@ object Sburb {
       if (game != null) games(game.gameId) = game
     }
 
-    SburbGame.readHouseData(games.values)
+    // SburbGame.readHouseData(games.values)
   }
 }

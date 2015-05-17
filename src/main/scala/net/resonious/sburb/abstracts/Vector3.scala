@@ -7,6 +7,8 @@ object Vector3 {
   implicit class IntTuple2Vec3(t: (Int,Int,Int)) {
     def vec() = new Vector3(t._1,t._2,t._3)
   }
+
+  def from[T](f: () => T): Vector3[T] = new Vector3[T](f(), f(), f())
 }
 
 class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {

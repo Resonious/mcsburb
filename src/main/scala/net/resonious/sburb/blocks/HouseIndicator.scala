@@ -99,6 +99,8 @@ class HouseIndicatorEntity(world: World) extends ActiveTileEntity {
   }
 }
 */
+
+/*
 class HouseIndicatorSyncPacket extends ActivePacket {
   @SideOnly(Side.SERVER)
   def send(player: EntityPlayer) = {
@@ -118,16 +120,17 @@ class HouseIndicatorSyncPacket extends ActivePacket {
       HouseIndicator.availableHouses += buf.readString
   }
 }
+*/
 
 object HouseIndicator extends ActiveBlock("House Indicator") {
 	// this hasTileEntity classOf[HouseIndicatorEntity]
 	setHardness(10000F)
-  val packet = new HouseIndicatorSyncPacket
+  // val packet = new HouseIndicatorSyncPacket
   val availableHouses = new ArrayBuffer[String]
 	
 	override def onBlockActivated(world:World, x:Int, y:Int, z:Int, player:EntityPlayer, dimension:Int, px:Float, py:Float, pz:Float):Boolean = {
 	  if (Sburb.isServer) {
-	    packet.send(player)
+	    // packet.send(player)
 	    player.openGui(Sburb, HouseIndicatorGui.id, world, x, y, z)
 	  }
 	  true
