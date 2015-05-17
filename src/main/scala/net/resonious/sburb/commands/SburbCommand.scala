@@ -25,7 +25,8 @@ import net.minecraft.block.BlockLeaves
 import net.minecraft.block.BlockLiquid
 import net.minecraft.block.BlockStaticLiquid
 import net.minecraft.block.BlockDynamicLiquid
-import net.minecraft.block.material.Material;
+import net.minecraft.block.material.Material
+import net.minecraft.util.ChunkCoordinates
 import scala.math
 
 object SburbCommand extends ActiveCommand {
@@ -71,7 +72,8 @@ object SburbCommand extends ActiveCommand {
 	}
 
 	override def canCommandSenderUseCommand(sender: ICommandSender) = {
-    sender.getCommandSenderName == "Metreck"
+    // sender.getCommandSenderName == "Metreck"
+    true
   }
 
 	override def addTabCompletionOptions(sender: ICommandSender, args: Array[String]) = {
@@ -116,7 +118,7 @@ object SburbCommand extends ActiveCommand {
 	
 	// COMMAND METHODS!   --Note: args are essentially 1-based here :/
 	@Command
-	def sburb(player: EntityPlayer) = {
+	def s(player: EntityPlayer) = {
 	  val props = SburbProperties of player
 	  if (props.hasGame)
 	  	props.serverMode.activated = !props.serverMode.activated
@@ -190,6 +192,7 @@ object SburbCommand extends ActiveCommand {
 	  player chat "Cleared Sburb game data for "+plr.getDisplayName+"!"
 	}
 
+  // TODO can this. The logic is in Structure.scala.
   @Command
   def housegen(player: EntityPlayer, args: Array[String]): Unit = {
     // Gonna be a bumpy ride...

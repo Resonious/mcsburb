@@ -4,10 +4,12 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.lang.reflect.Field
 import java.util.Scanner
+import java.io.FilenameFilter
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
@@ -23,6 +25,10 @@ import net.resonious.sburb.Sburb
 import net.resonious.sburb.abstracts.SburbException
 import net.resonious.sburb.abstracts.Vector3
 import net.resonious.sburb.game.grist.Grist
+import net.resonious.sburb.Structure
+import net.minecraft.world.World
+import net.minecraft.item.ItemStack
+import net.resonious.sburb.items.SburbDisc
 
 class AlreadyHasServerException(plr: SburbGame.PlayerEntry) extends SburbException(
   plr.name + " already has a server player: " + plr.server
@@ -49,9 +55,14 @@ class NotInGameException(p1: SburbProperties, p2: SburbProperties) extends Sburb
     msgs mkString " | "
   }
 )
+class HouseDoesNotExistException(houseName: String) extends SburbException(
+  "There is no house file "+houseName+".sst in the houses directory"
+)
 
 object SburbGame {
-  // Quick helper function to get a valid filename from a game ID
+  val rand = new Random
+
+  // Because writing `+ ".sburb"` is simply too much...
   implicit class SburbFileString(str: String) {
   	def sburb() = str + ".sburb"
   }
@@ -82,10 +93,31 @@ object SburbGame {
       }
     }
   }
+
+  def randomHouseName(): String = {
+    (new File("houses")).listFiles(new FilenameFilter {
+      override def accept(_dir: File, name: String): Boolean = name contains ".sst"
+    }) match {
+      case null => {
+        // TODO perhaps support no house... lol
+        // Also maybe add some default houses into the jar.
+        throw new SburbException("No houses folder found.")
+      }
+
+      case Array() => {
+        throw new SburbException("No .sst structure files in houses folder were found.")
+      }
+
+      case files => files(rand.nextInt(files.length)).getName.replace(".sst", "")
+    }
+  }
   
   // Reads from houses.dat to populate house data.
   // This should be called AFTER SburbGames are loaded.
+  // TODO actually can this. We do not want anymore!!!
   def readHouseData(games: Iterable[SburbGame]): Unit = {
+    throw new SburbException("NO MORE HOUSES.DAT!")
+
     def asInts(str: String) = {
       str.split(',') map { i=> (Integer valueOf i).asInstanceOf[Int] }
     }
@@ -144,7 +176,8 @@ object SburbGame {
           val corner1 = asInts(data(1))
           val corner2 = asInts(data(2))
           
-          availableHouses += new PlayerHouse(houseName, position, corner1, corner2)
+          // TODO since this function is gone, we gotta change that constructor
+          // availableHouses += new PlayerHouse(houseName, position, corner1, corner2)
           
           if (!(SburbGame.allHouseNames contains houseName))
             SburbGame.allHouseNames += houseName
@@ -173,10 +206,11 @@ object SburbGame {
   // Every house name.
   val allHouseNames = new ArrayBuffer[String]
   // List of houses ripe for the taking.
-  val availableHouses = new ArrayBuffer[PlayerHouse]
+  // TODO NO MORE! ALL HOUSES IN /houses ARE FAIR GAME ALWAYS
+  // val availableHouses = new ArrayBuffer[PlayerHouse]
   
   // This structure contains all sburb-related state that used to be a part of SburbProperties
-  class PlayerEntry(n:String="", h:PlayerHouse=null) extends Serializable {
+  class PlayerEntry(n:String = "", h:PlayerHouse = null) extends Serializable {
     @transient private var _game: SburbGame = null
     def game = _game
     def game_=(g:SburbGame) = 
@@ -206,22 +240,100 @@ object SburbGame {
       else null
     
     // This should be called before Sburb data is cleared so the house can be returned.
+    // ===
+    // At this point I think it doesn't matter TOO much if there are duplicate houses
     def beforeClear() = {
-      SburbGame.availableHouses += house
-      Sburb log "Returned house "+house.name
+      // SburbGame.availableHouses += house
+      // Sburb log "Returned house "+house.name
     }
       
     private def str(s: String) = if (s.isEmpty) "---" else s
     override def toString() = house.name+": "+str(server)+" -> "+str(name)+" -> "+str(client)
   }
   
-  class PlayerHouse(_name:String, _spawn: Vector3[Int], corner1:Array[Int], corner2:Array[Int]) extends Serializable {
+  class PlayerHouse(_name:String, world: World) extends Serializable {
+    // TODO hopefully assigning this spawn variable won't be too difficult......
+    var _spawn: Vector3[Int] = new Vector3[Int]
+    var minX: Int = 0
+    var maxX: Int = 0
+    var minZ: Int = 0
+    var maxZ: Int = 0
+
+    @transient val rand = new Random
+
+    def genTestCoord: Int = {
+      // NOTE Random#nextInt gives from 0 to max, and we want some negatives too.
+      val r = rand.nextInt(10000)
+      r - r/2
+    }
+
+    try {
+      val struct = Structure.load("houses/"+_name+".sst")
+
+      // Right here... Place the house.
+      var tryCount = 1
+      var found = false
+
+      while (!found) {
+        val testPoint = new Vector3[Int](genTestCoord, 200, genTestCoord)
+
+        Sburb log "Checking ["+testPoint.x+", "+testPoint.y+", "+testPoint.z+"] with a 500 block radius for house spawn point."
+
+        struct.findReasonableSpawnPoint(world, testPoint, 500) match {
+          case Some(point) => {
+            Sburb log "Found a spot! ["+point.x+", "+point.y+", "+point.z+"]"
+
+            minX = point.x - struct.centerOffset.x
+            maxX = point.x + struct.centerOffset.x
+            minZ = point.z - struct.centerOffset.z
+            maxZ = point.z + struct.centerOffset.z
+
+            val minSize = 26
+            val halfMinSize = minSize / 2
+
+            val xDif = maxX - minX
+            if (xDif < minSize) {
+              maxX += halfMinSize - xDif
+              minX -= halfMinSize - xDif
+            }
+            val zDif = maxZ - minZ
+            if (zDif < minSize) {
+              maxZ += halfMinSize - zDif
+              minZ -= halfMinSize - zDif
+            }
+
+            _spawn.y = point.y + 5
+            _spawn.x = minX
+            _spawn.z = minZ
+
+            Sburb log "Placing structure..."
+            struct.placeAt(world, point, false)
+            Sburb log "Done."
+
+            found = true
+          }
+
+          case None => {
+            tryCount += 1
+
+            Sburb log "Try #"+tryCount+" - couldn't find any good spot."
+
+            if (tryCount >= 10) {
+              throw new SburbException("Tried 10 TIMES TO PLACE A DAMN HOUSE. BRUH.")
+            }
+          }
+        }
+      }
+
+    } catch {
+      case e: IOException => {
+        throw new HouseDoesNotExistException(_name)
+      }
+    }
+
+    // So this now means the file name.
     var name = _name
 
-    var minX = corner1(0) min corner2(0)
-    var minZ = corner1(1) min corner2(1)
-    var maxX = corner1(0) max corner2(0)
-    var maxZ = corner1(1) max corner2(1)
     var spawn: Vector3[Int] = _spawn
     
     @transient lazy val maxFields = getClass.getDeclaredFields filter { 
@@ -259,12 +371,9 @@ object SburbGame {
 }
 
 class SburbGame(gid: String = "") extends Serializable {
-  // Transient because don't serialize RNG
-  @transient
-  val rand = new Random
+  @transient val rand = new Random
 
-  @transient
-  var currentlySaving = false
+  @transient var currentlySaving = false
   
   private var players = new HashMap[String, PlayerEntry]
   
@@ -321,6 +430,7 @@ class SburbGame(gid: String = "") extends Serializable {
         // Client/server can never be assigned to players of
         // separate games.
         // TODO perhaps fuse the games, though?
+        // But... We don't actually have support for multiple games atm.
         throw new DifferentGameException(entryOf(client), entryOf(server))
     } else {
       // Since houses must be assigned first, both players must be playing
@@ -331,9 +441,9 @@ class SburbGame(gid: String = "") extends Serializable {
   }
   
   // Add a new player with no associations to the game
-  def newPlayer(plr: Any, house: Any, logError: Boolean = true):Boolean = {
+  def newPlayer(plr: Any, wantedHouse: Any, logError: Boolean = true):Boolean = {
     var entityPlr: EntityPlayer = null
-    val aname = plr match {
+    val name = plr match {
       case ep: EntityPlayer => {
         entityPlr = ep
         entityPlr.getGameProfile.getName
@@ -342,25 +452,30 @@ class SburbGame(gid: String = "") extends Serializable {
         entityPlr = props.player
         entityPlr.getGameProfile.getName
       }
-      case str: String => str
+      case str: String => {
+        entityPlr = Sburb.playerOfName(str)
+        str
+      }
     }
-    val houseIndex = house match {
-      case i: Int => i
-      case s: String => availableHouses indexOf (availableHouses filter { _.name == s })
-      case h: PlayerHouse => availableHouses indexOf h
-    }
-    // TODO maybe good idea to check that houseIndex is valid here
-    
-    // Ignore this garbage
-    // For testing; if the name is Player123 or whatever, it's always the same damn person
-    val name = aname // if (("Player\\d+".r findAllIn aname).length > 0) "Player" else aname
-    
+
     if (players contains name) {
       if(logError) Sburb logError "Game "+gameId+" already has an entry for "+name
       return false
     }
-    val newEntry = new PlayerEntry(name, availableHouses(houseIndex))
-    availableHouses remove houseIndex
+    if (entityPlr == null) {
+      if(logError) Sburb logError "Player "+name+" is not logged in"
+      return false
+    }
+
+    val house = wantedHouse match {
+      case s: String => new PlayerHouse(s, entityPlr.worldObj)
+      case h: PlayerHouse => h
+    }
+
+    entityPlr.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
+    
+    val newEntry = new PlayerEntry(name, house)
+    
     newEntry.game = this
     players.put(name, newEntry)
     checkPlayerGrist(newEntry)

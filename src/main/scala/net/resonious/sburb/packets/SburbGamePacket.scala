@@ -8,26 +8,29 @@ import net.resonious.sburb.abstracts.SburbException
 import net.resonious.sburb.game.SburbProperties
 import cpw.mods.fml.relauncher.SideOnly
 import cpw.mods.fml.relauncher.Side
+import cpw.mods.fml.common.network.ByteBufUtils
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.game.After
 import net.minecraft.util.ChunkCoordinates
 
 object SburbGamePacket {
   // This packet adds a new player to a Sburb game
+  // NOTE Okay I repurposed this for house names instead of ids (for the files)
+  // and I do not think it is currently used.
 	class NewPlayerPacket extends ActivePacket {
-	  var houseId = 0
+		var houseName = "ryan"
 
 	  @SideOnly(Side.CLIENT)
-	  def send(houseId: Int) = {
-	    this.houseId = houseId
+	  def send(houseName: String) = {
+	    this.houseName = houseName
 	    PacketPipeline.sendToServer(this)
 	  }
 
 	  override def write(buf: ByteBuf) = {
-	    buf writeInt houseId
+	  	ByteBufUtils.writeUTF8String(buf, houseName)
 	  }
 	  override def read(buf: ByteBuf) = {
-	    houseId = buf.readInt
+	    houseName = ByteBufUtils.readUTF8String(buf)
 	  }
 
 	  override def onServer(player: EntityPlayer) = {
@@ -40,7 +43,7 @@ object SburbGamePacket {
 	      case 1 => Sburb.games.values.iterator.next
 	      case _ => throw new SburbException("Don't know what to do with more than 1 game yet!")
 	    }
-	  	if (!game.newPlayer(player, houseId, true))
+	  	if (!game.newPlayer(player, houseName, true))
 	  	  throw new SburbException("Something went wrong adding "+player.getDisplayName+" to a Sburb game!")
 	  	else {
 	  	  val housePos = props.gameEntry.house.spawn
