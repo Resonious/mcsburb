@@ -10,7 +10,8 @@ import java.lang.reflect.Field
 import java.util.Scanner
 import scala.collection.mutable.HashMap
 
-import li.cil.oc.common.tileentity.Case
+// import li.cil.oc.common.tileentity.Case
+import li.cil.oc.api.internal.Case
 import net.minecraft.item.ItemStack
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.minecraftforge.common.DimensionManager
@@ -165,10 +166,12 @@ object Structure {
           case computerCase: Case => {
             val items = new NBTTagList
 
-            for (i <- 0 until computerCase.items.length) {
-              computerCase.items[i] match {
-                case Some(stack) => {
-                  val itemName = Item.itemRegistry.getNameFromObject(stack.getItem)
+            for (i <- 0 until computerCase.getSizeInventory) {
+              computerCase.getStackInSlot(i) match {
+                case null => {}
+
+                case stack => {
+                  val itemName = Item.itemRegistry.getNameForObject(stack.getItem)
                   val stackTag = new NBTTagCompound
 
                   stackTag.setInteger("slot", i)
@@ -176,8 +179,6 @@ object Structure {
 
                   items.appendTag(stackTag)
                 }
-
-                case None => {}
               }
             }
 
@@ -235,7 +236,7 @@ object Structure {
               val item = Item.itemRegistry.getObject(itemName).asInstanceOf[Item]
               val stack = new ItemStack(item)
 
-              computerCase.updateItems(slot, stack)
+              computerCase.setInventorySlotContents(slot, stack)
             }
           }
         }
