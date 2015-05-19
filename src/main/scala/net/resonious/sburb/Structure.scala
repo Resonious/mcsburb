@@ -11,9 +11,11 @@ import java.util.Scanner
 import scala.collection.mutable.HashMap
 
 // import li.cil.oc.common.tileentity.Case
-import li.cil.oc.api.internal.Case
+import li.cil.oc
+import li.cil.oc
 import net.minecraft.item.ItemStack
 import net.resonious.sburb.abstracts.PacketPipeline
+import net.resonious.sburb.game.After
 import net.minecraftforge.common.DimensionManager
 import io.netty.buffer.ByteBuf
 import cpw.mods.fml.relauncher.SideOnly
@@ -163,7 +165,7 @@ object Structure {
       if (assumeSameOCState) writeNormally()
       else {
         tileEntity match {
-          case computerCase: Case => {
+          case computerCase: oc.api.internal.Case => {
             val items = new NBTTagList
 
             for (i <- 0 until computerCase.getSizeInventory) {
@@ -171,13 +173,15 @@ object Structure {
                 case null => {}
 
                 case stack => {
-                  val itemName = Item.itemRegistry.getNameForObject(stack.getItem)
-                  val stackTag = new NBTTagCompound
+                  val itemName = oc.api.Items.get(stack).name
+                  val tag      = new NBTTagCompound
+                  val stackTag = stack.getTagCompound
 
-                  stackTag.setInteger("slot", i)
-                  stackTag.setString("itemName", itemName)
+                  tag.setInteger("slot", i)
+                  tag.setString("itemName", itemName)
+                  if (stackTag != null) tag.setTag("stackTag", stackTag)
 
-                  items.appendTag(stackTag)
+                  items.appendTag(tag)
                 }
               }
             }
@@ -225,18 +229,19 @@ object Structure {
 
       else if (computerCaseData != null) {
         tileEntity match {
-          case computerCase: Case => {
+          case computerCase: oc.api.internal.Case => {
             val items = computerCaseData.getTag("items").asInstanceOf[NBTTagList]
 
             for (i <- 0 until items.tagCount) {
-              val stackTag = items.getCompoundTagAt(i)
-              val slot     = stackTag.getInteger("slot")
-              val itemName = stackTag.getString("itemName")
+              val tag      = items.getCompoundTagAt(i)
+              val slot     = tag.getInteger("slot")
+              val itemName = tag.getString("itemName")
+              val stackTag = tag.getTag("stackTag").asInstanceOf[NBTTagCompound]
 
-              val item = Item.itemRegistry.getObject(itemName).asInstanceOf[Item]
-              val stack = new ItemStack(item)
+              val stack = oc.api.Items.get(itemName).createItemStack(1)
+              if (stackTag != null) stack.setTagCompound(stackTag)
 
-              computerCase.setInventorySlotContents(slot, stack)
+              After(5, 'ticks) execute { computerCase.setInventorySlotContents(slot, stack) }
             }
           }
         }
