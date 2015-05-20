@@ -8,6 +8,7 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.lang.reflect.Field
 import java.util.Scanner
+import java.io.IOException
 import scala.collection.mutable.HashMap
 
 // import li.cil.oc.common.tileentity.Case
@@ -278,7 +279,12 @@ object Structure {
   }
 
   def load(fileName: String): Structure = {
-    var fileIn = new FileInputStream(fileName)
+    var fileIn = try new FileInputStream(fileName) catch {
+      case e: IOException => Sburb.getClass.getResourceAsStream("/assets/sburb/"+fileName) match {
+        case null => throw e
+        case s => s
+      }
+    }
     var in = new ObjectInputStream(fileIn)
 
     var fileTag = new NBTTagCompound
@@ -286,7 +292,6 @@ object Structure {
 
     fromTagComp(fileTag)
   }
-
 }
 
 class Structure(
