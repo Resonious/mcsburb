@@ -61,6 +61,7 @@ class HouseDoesNotExistException(houseName: String) extends SburbException(
 
 object SburbGame {
   val rand = new Random
+  final val builtInHouseNames = Array("amber", "kyle", "r1", "ryan")
 
   // Because writing `+ ".sburb"` is simply too much...
   implicit class SburbFileString(str: String) {
@@ -95,21 +96,18 @@ object SburbGame {
   }
 
   def randomHouseName(): String = {
-    (new File("houses")).listFiles(new FilenameFilter {
-      override def accept(_dir: File, name: String): Boolean = name contains ".sst"
-    }) match {
-      case null => {
-        // TODO perhaps support no house... lol
-        // Also maybe add some default houses into the jar.
-        throw new SburbException("No houses folder found.")
+    val houseFiles =
+      (new File("houses")).listFiles(new FilenameFilter {
+        override def accept(_dir: File, name: String): Boolean = name contains ".sst"
+      }) match {
+        case null => Array[String]()
+
+        // case files => files(rand.nextInt(files.length)).getName.replace(".sst", "")
+        case files => files.map(_.getName.replace(".sst", ""))
       }
 
-      case Array() => {
-        throw new SburbException("No .sst structure files in houses folder were found.")
-      }
-
-      case files => files(rand.nextInt(files.length)).getName.replace(".sst", "")
-    }
+    val houseNames: Array[String] = houseFiles ++ builtInHouseNames
+    houseNames(rand.nextInt(houseNames.length))
   }
   
   // Reads from houses.dat to populate house data.
