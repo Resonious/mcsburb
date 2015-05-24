@@ -225,7 +225,9 @@ object Structure {
           tileEntityData.setInteger("y", y);
           tileEntityData.setInteger("z", z);
         }
-        tileEntity.readFromNBT(tileEntityData)
+        try tileEntity.readFromNBT(tileEntityData) catch {
+          case e: Throwable => Sburb log "error while loading tile entity from struct: "+e.getMessage
+        }
       }
 
       else if (computerCaseData != null) {

@@ -145,6 +145,7 @@ class SburbServerMode(props: SburbProperties = null) {
   private var beenToClientBefore = false
 
   private var otherPos = (300.0, 200.0, 1000.0)
+  private var otherDim = 0
   private var otherInventory = new NBTTagList
   private var otherHealth = 100.0f
   private var otherFoodLevel = 20
@@ -183,9 +184,11 @@ class SburbServerMode(props: SburbProperties = null) {
   @SideOnly(Side.SERVER)
   private def swapPos(): Unit = {
     val plrPos = (player.posX, player.posY, player.posZ)
-    player.setPositionAndUpdate(otherPos.x, otherPos.y, otherPos.z)
-    // TODO player world may have to be set at some point, oh boy!
+    val plrDim = player.worldObj.provider.dimensionId
+    // player.setPositionAndUpdate(otherPos.x, otherPos.y, otherPos.z)
+    Sburb.warpPlayer(player, otherDim, (new Vector3(otherPos)) map { _.toInt })
     otherPos = plrPos
+    otherDim = plrDim
   }
   @SideOnly(Side.SERVER)
   private def swapInv(): Unit = {
@@ -297,10 +300,14 @@ class SburbServerMode(props: SburbProperties = null) {
   def activated_=(to:Boolean):Unit = {
     if (to != _activated) {
       if (Sburb.isServer) {
-        // Set spawn point to client player's house if it's the first activation.
-        if (!beenToClientBefore) {
-          otherPos = props.gameEntry.clientEntry.house.spawn tupMap { _.toDouble }
+        // Set spawn point to client player's house if it's the first activation
+        // or if the client was warped to the medium.
+        var client = props.gameEntry.clientEntry
+        if (!beenToClientBefore || client.house.wasMoved) {
+          otherPos = client.house.spawn tupMap { _.toDouble }
+          otherDim = client.mediumId
           beenToClientBefore = true
+          client.house.wasMoved = false
         }
 
         swapPos()
@@ -376,6 +383,7 @@ class SburbServerMode(props: SburbProperties = null) {
     comp.setDouble("servX", otherPos.x)
     comp.setDouble("servY", otherPos.y)
     comp.setDouble("servZ", otherPos.z)
+    comp.setDouble("servDim", otherDim)
 
     comp.setTag("servInv", otherInventory)
     comp.setFloat("servHp", otherHealth)
@@ -389,6 +397,7 @@ class SburbServerMode(props: SburbProperties = null) {
   def load(comp: NBTTagCompound) = {
     val coord = { x:Char => comp.getDouble("serv"+x) }
     otherPos = (coord('X'), coord('Y'), coord('Z'))
+    otherDim = comp.getInteger("servDim")
 
     otherInventory = comp.getTagList("servInv", Constants.NBT.TAG_COMPOUND)
     otherHealth = comp.getFloat("servHp")

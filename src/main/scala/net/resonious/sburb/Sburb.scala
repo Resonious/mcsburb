@@ -10,6 +10,7 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent
 import cpw.mods.fml.common.event.FMLServerStartingEvent
 import cpw.mods.fml.common.registry.GameRegistry
 import net.minecraftforge.common.MinecraftForge
+import net.minecraftforge.common.ForgeChunkManager
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.game.SburbGame
 import net.resonious.sburb.game.grist.Grist
@@ -39,13 +40,14 @@ import java.util.Random
 import net.minecraftforge.client.IItemRenderer
 import net.resonious.sburb.blocks.GristShopItem
 import net.resonious.sburb.game.grist.GristShopItemRenderer
+import com.xcompwiz.mystcraft.api.impl.InternalAPI
+import net.minecraft.util.ChunkCoordinates
+import net.minecraft.entity.player.EntityPlayer
 import net.dinkyman.sburb.DMain
 
 @Mod(modid = "sburb", version = "0.0.0", modLanguage = "scala",
   dependencies = "required-after:OpenComputers@[1.5.0,)")
 object Sburb {
-
-
   @SidedProxy(modId="sburb",clientSide="net.resonious.sburb.proxy.ClientProxy",
                             serverSide="net.resonious.sburb.proxy.CommonProxy")
 	var proxy:CommonProxy = new CommonProxy
@@ -70,6 +72,17 @@ object Sburb {
         return entityPlayer
     }
     null
+  }
+
+  def warpPlayer(player: EntityPlayer, dim: Int, to: Vector3[Int]): Unit = {
+    if (player.worldObj.provider.dimensionId != dim) {
+      val link = InternalAPI.linking.createLinkInfoFromPosition(player.worldObj, player)
+      link.setDimensionUID(dim)
+      link.setSpawn(new ChunkCoordinates(to.x, to.y, to.z))
+      InternalAPI.linking.linkEntity(player, link)
+    } else {
+      player.setPositionAndUpdate(to.x, to.y, to.z)
+    }
   }
 
 	var games = new HashMap[String, SburbGame]
@@ -195,6 +208,7 @@ object Sburb {
   @EventHandler
   def postInit(event: FMLPostInitializationEvent) {
     PacketPipeline.postInitialise
+    ForgeChunkManager.setForcedChunkLoadingCallback(this, ForgeEvents)
     DMain.postInit(event)
   }
 

@@ -15,6 +15,7 @@ import net.minecraftforge.client.event.MouseEvent
 import net.minecraftforge.event.entity.EntityEvent.EntityConstructing
 import net.minecraftforge.event.entity.EntityJoinWorldEvent
 import net.minecraftforge.event.entity.living.LivingEvent.LivingUpdateEvent
+import net.minecraftforge.event.entity.living.LivingHurtEvent
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent
 import net.minecraftforge.event.entity.player.PlayerInteractEvent
 import net.resonious.sburb.abstracts.PacketPipeline
@@ -26,6 +27,7 @@ import net.minecraft.block.Block
 import net.resonious.sburb.game.After
 import net.resonious.sburb.packets.ActivePacket
 import net.resonious.sburb.abstracts.Pimp._
+import net.minecraft.world.World
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import io.netty.channel.ChannelHandlerContext
@@ -44,8 +46,10 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent
 import scala.util.Random
 import net.resonious.sburb.blocks.MultiBlock
 import net.resonious.sburb.blocks.GristShopItem
+import net.minecraftforge.common.ForgeChunkManager
+import net.minecraftforge.common.ForgeChunkManager.Ticket
 
-object ForgeEvents {
+object ForgeEvents extends ForgeChunkManager.LoadingCallback {
   private var inited = false
   val blockHardness = try {
     classOf[Block].getDeclaredField("field_149782_v")
@@ -54,6 +58,10 @@ object ForgeEvents {
       classOf[Block].getDeclaredField("blockHardness")
   }
   blockHardness.setAccessible(true)
+
+  def ticketsLoaded(tickets: java.util.List[Ticket], world: World): Unit = {
+    Sburb log "lol tickets"
+  }
 
 	@SubscribeEvent
 	def onEntityJoinWorldEvent(event: EntityJoinWorldEvent) = {
@@ -83,6 +91,22 @@ object ForgeEvents {
   }
 
   @SubscribeEvent
+  def onLivingHurtEvent(event: LivingHurtEvent) = {
+    if (Sburb.isServer)
+      event.entity match {
+        case player: EntityPlayer => {
+          val props = SburbProperties of player
+          if (props.hasGame && (props.gameEntry.houseCurrentlyBeingMoved || props.serverMode.activated)) {
+            // Sburb log "DEFLECT HURT"
+            event setCanceled true
+          }
+          // else Sburb log "AN ENTITY WAS REALLY HURT!!!!!"
+        }
+        case _ =>
+      }
+  }
+
+  @SubscribeEvent
   def onEntityConstructing(event: EntityConstructing) = {
     event.entity match {
       case player: EntityPlayer => SburbProperties register player
@@ -91,7 +115,7 @@ object ForgeEvents {
   }
 
   @SubscribeEvent
-  def onEntityItemPickupEvent(event: EntityItemPickupEvent):Unit = {
+  def onEntityItemPickupEvent(event: EntityItemPickupEvent): Unit = {
     val item = event.item.getEntityItem.getItem
     if (item.isGristItem) {
       val player = event.entityPlayer
@@ -179,10 +203,6 @@ object ForgeEvents {
 
   @SubscribeEvent
   def onAttackEntityEvent(event: AttackEntityEvent) = {
-    /*val props = SburbProperties of event.entityPlayer
-    if (props.serverMode.activated) {
-      event.setCanceled(true)
-    }*/
   }
 
   @SubscribeEvent
