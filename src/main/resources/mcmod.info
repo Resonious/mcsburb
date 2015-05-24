@@ -11,6 +11,6 @@
   "credits": "Nigel Baillie yeeeeah",
   "logoFile": "",
   "screenshots": [],
-  "dependencies": []
+  "dependencies": ["OpenComputers"]
 }
 ]

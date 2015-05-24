@@ -4,7 +4,9 @@ import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import scala.collection.JavaConverters.seqAsJavaListConverter
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
+import scala.util.Random
 import io.netty.buffer.ByteBuf
 import net.minecraft.command.ICommandSender
 import net.minecraft.entity.player.EntityPlayer
@@ -12,6 +14,8 @@ import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraft.server.MinecraftServer
 import net.resonious.sburb.Sburb
 import net.resonious.sburb.abstracts._
+import net.minecraft.world.biome.BiomeGenBase
+import net.minecraft.world.ChunkCoordIntPair
 import net.resonious.sburb.abstracts.ActiveCommand
 import net.resonious.sburb.abstracts.Pimp._
 import net.resonious.sburb.abstracts.Command
@@ -26,7 +30,15 @@ import net.minecraft.block.BlockLiquid
 import net.minecraft.block.BlockStaticLiquid
 import net.minecraft.block.BlockDynamicLiquid
 import net.minecraft.block.material.Material
+import net.minecraft.item.ItemStack
 import net.minecraft.util.ChunkCoordinates
+import com.xcompwiz.mystcraft.api.impl.InternalAPI
+import com.xcompwiz.mystcraft.world.agedata.AgeData
+import com.xcompwiz.mystcraft.world.WorldProviderMyst
+import com.xcompwiz.mystcraft.api.util.Color
+import com.xcompwiz.mystcraft.page.Page
+import net.minecraftforge.common.DimensionManager
+import net.minecraftforge.common.ForgeChunkManager
 import scala.math
 
 object SburbCommand extends ActiveCommand {
@@ -37,6 +49,11 @@ object SburbCommand extends ActiveCommand {
 	    	player.func_145748_c_.appendText(": "+msg)
 	    )
 	  }
+
+    def chatAndLog(msg: String) = {
+      chat(msg)
+      Sburb log player.getCommandSenderName+": "+msg
+    }
 	}
 	
 	var methods = new HashMap[String, Method]
@@ -192,135 +209,180 @@ object SburbCommand extends ActiveCommand {
 	  player chat "Cleared Sburb game data for "+plr.getDisplayName+"!"
 	}
 
-  // TODO can this. The logic is in Structure.scala.
   @Command
-  def housegen(player: EntityPlayer, args: Array[String]): Unit = {
-    // Gonna be a bumpy ride...
-    val world = player.worldObj
-    var start = new Vector3[Int](
-      player.posX.intValue,
-      player.posY.intValue,
-      player.posZ.intValue
+  def agename(player: EntityPlayer, args: Array[String]): Unit = {
+    val age = AgeData.getAge(Integer.parseInt(args(1)), false)
+    player chat "Age name: "+age.getAgeName()
+  }
+
+  @Command
+  def medium(player: EntityPlayer, args: Array[String]): Unit = {
+    val props = SburbProperties of player
+    if (!props.hasGame) {
+      player chat "No sburb game!"
+      return
+    }
+
+    val serverPlayer = props.gameEntry.serverPlayer
+    if (serverPlayer != null) {
+      val serverProps = SburbProperties of serverPlayer
+      serverProps.serverMode.activated = false
+    }
+
+    val playerEntry = props.gameEntry
+    val house       = playerEntry.house
+
+    val savedHouse = new Structure(
+      player.worldObj,
+      (house.minX, house.minY, house.minZ),
+      (house.maxX, 500,        house.maxZ),
+      Map("minecraft:dirt" -> 'ignore)
     )
+    savedHouse.centerOffset.y = house.centerY
 
-    val structure = Structure.load(if (args.length > 1) args(1) else "structure.sst")
+    val dimensionId = InternalAPI.dimension.createAge
+    val age         = AgeData.getAge(dimensionId, false)
 
-    def blockAt(s: Vector3[Int]) = world.getBlock(s.x, s.y, s.z)
+    age.setInstabilityEnabled(false)
+    val rand = new Random
 
-    // Ignore and trees, for now.
-    def ignoreBlockAt(s: Vector3[Int]) = {
-      val block = blockAt(s)
+    var symbols = new ListBuffer[String]
+    symbols ++= List("DenseOres", "Caves", "BioConSingle")
 
-      world.isAirBlock(s.x, s.y, s.z) ||
-      block.isInstanceOf[BlockWood]   ||
-      block.isInstanceOf[BlockLeaves]
+    val terrain = Array(
+      "TerrainNormal", "TerrainAplified", "TerrainEnd"
+    )
+    symbols += terrain(rand.nextInt(terrain.length))
+
+    val obstructions = Array(
+      "TerModSpheres", "FloatIslands", "Tendrils", "Obelisks",
+      "StarFissure", "HugeTrees", "GenSpikes", "CryForm"
+    )
+    symbols += obstructions(rand.nextInt(obstructions.length))
+    symbols += obstructions(rand.nextInt(obstructions.length))
+
+    val exploration = Array(
+      "Villages", "NetherFort", "Mineshafts", "Dungeons",
+      "Ravines", "LakesDeep"
+    )
+    symbols += exploration(rand.nextInt(exploration.length))
+    symbols += exploration(rand.nextInt(exploration.length))
+
+    val colors = Array(
+      "ModBlack", "ModRed", "ModGreen", "ModBlue",
+      "ModYellow", "ModWhite"
+    )
+    val color = colors(rand.nextInt(colors.length))
+    symbols ++= List(
+      color, "ColorFog",
+      color, "ColorFogNat",
+      color, "ColorSky",
+      color, "ColorSkyNat",
+      color, "ColorWater",
+      color, "ColorWaterNat",
+      color, "ColorGrass",
+      color, "ColorFoliage"
+    )
+    symbols ++= List(colors(rand.nextInt(colors.length)), "ColorCloud")
+    symbols ++= List(colors(rand.nextInt(colors.length)), "ColorSkyNight")
+    if (rand.nextInt(3) == 1) symbols += "Rainbow"
+
+    // TODO the land of ?? and ??
+    age setAgeName player.getDisplayName() + " medium"
+    age setPages (symbols.map(Page.createSymbolPage))
+      .asJava
+      .asInstanceOf[java.util.List[ItemStack]]
+
+    playerEntry.mediumId = dimensionId
+    // Events.scala makes the player invincible while houseCurrentlyBeingMoved is
+    // true. This makes them not die from fall damage here.
+    playerEntry.houseCurrentlyBeingMoved = true
+    Sburb.warpPlayer(player, dimensionId, new Vector3(0, 100, 0))
+
+    val newWorld = DimensionManager.getWorld(dimensionId)
+    val ticket = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
+    val forceLoadChunk = new ChunkCoordIntPair(0, 0)
+    ForgeChunkManager.forceChunk(ticket, forceLoadChunk)
+
+    After(5, 'seconds) execute {
+      Sburb log "PLACING HOUSE INTO MEDIUM"
+      house.placeIntoWorld(savedHouse, newWorld)
+      house.wasMoved = true
+      Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
+
+      // TODO unsure if this is any good
+      playerEntry.spawnPointDirty = true
+
+      val housePos = house.spawn
+      player.setPositionAndUpdate(
+          housePos.x,
+          housePos.y,
+          housePos.z)
+      val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
+      player.setSpawnChunk(coords, true, dimensionId)
+
+      Sburb log "SET PLAYER'S SPAWN POINT IN MEDIUM"
+      playerEntry.houseCurrentlyBeingMoved = false
+      ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
     }
+  }
 
-    def heightAt(s: Vector3[Int]): Int =
-      if (ignoreBlockAt(s))
-        if (ignoreBlockAt(s.instead(_.y -= 1)))
-          heightAt(s.instead( _.y -= 1 ))
-        else
-          s.y
-      else
-        heightAt(s.instead( _.y += 1 ))
+  @Command
+  def mediumtest(eplayer: EntityPlayer, args: Array[String]): Unit = {
+    val player    = eplayer.asInstanceOf[EntityPlayerMP]
+    val colorBlue = new Color(0.2f, 0.4f, 1f)
 
-    // So that we can cache heights at any position - this function will be called
-    // many times at any given x/z posibion.
-    // Also whether or not the ground block at that given point is water.
-    var heights = new HashMap[(Int, Int), (Int, Boolean)]
+    val dimensionId = InternalAPI.dimension.createAge
+    val age         = AgeData.getAge(dimensionId, false)
 
-    // Estimate of top-down structure area - we assume the structure has some
-    // padding in it (that its bounds are greater than the actual thing contained)
-    // and so we use 3.5 instead of 4, arbitrarily.
-    val structArea = 3.5 * structure.centerOffset.x * structure.centerOffset.z
-    // Accept up to 1/16th of the approx structure area of extremes.
-    val extremesTolerance = structArea / 16
+    // def addSymbol(sym: String) = age.addPage(Page.createSymbolPage(sym), 0)
 
-    // Accept up to 1/4th of the ground below the structure to be water.
-    val watersTolerance = structArea / 4
+    val link = InternalAPI.linking.createLinkInfoFromPosition(player.worldObj, player)
 
-    // This will get called tonnnnnnnnnns of times. Returns a position with the same
-    // x and z coords as input, and y value of the smallest (sane) height recorded
-    // during the scan IF it determines the given center is deemed suitable.
-    def acceptableCenterAt(center: Vector3[Int]): Option[Vector3[Int]] = {
-      var curPos = new Vector3[Int](center)
+    Sburb log "Nabbed dimension "+dimensionId
 
-      var maxHeight = heightAt(curPos)
-      var minHeight = maxHeight
+    age.setInstabilityEnabled(false)
 
-      // We'll call any sudden large drop or rise in block height an "extreme".
-      // Too many of these, and we will consider this an center unacceptable.
-      var extremes = 0
-
-      // Count how many ground blocks are water. We don't want houses on rivers or lakes.
-      var waters = 0
-
-      // Assume the x/z of centerOffset is effectively the "radius" of the
-      // structure's top-down area.
-      for (xOffset <- -structure.centerOffset.x to structure.centerOffset.x)
-      for (zOffset <- -structure.centerOffset.z to structure.centerOffset.z) {
-        curPos = center instead { s => s.x += xOffset; s.z += zOffset }
-
-        val heightInfo = heights.get((curPos.x, curPos.z)) match {
-          case Some(values) => values
-
-          case None => {
-            val h = heightAt(curPos)
-            val b = blockAt(curPos.instead(_.y = h - 1))
-            val bIsWater = b.getMaterial == Material.water
-
-            heights((curPos.x, curPos.z)) = (h, bIsWater)
-            (h, bIsWater)
-          }
-        }
-
-        // === Check if we're over too much water ===
-        val isWater = heightInfo match { case (_, b) => b }
-
-        if (isWater) waters += 1
-        if (waters > watersTolerance) return None
-
-        // === Make sure terrain is still acceptable ===
-        val height = heightInfo match { case (h, _) => h }
-
-        // If we encounter an extreme, don't count it toward min/max height
-        if (height - maxHeight > 5) {
-          extremes += 1
-        } else if (minHeight - height > 5) {
-          extremes += 1
-        }
-        else if (height < minHeight) minHeight = height
-        else if (height > maxHeight) maxHeight = height
-
-        if (extremes > extremesTolerance) return None
-        else if (maxHeight - minHeight > 6) return None
+    // age.addSymbol("TerrainAplified", 0)
+    // age.addSymbol("StarsTwinkle", 0)
+    // age.addSymbol("FloatingIslands", 0)
+    // age.addSymbol("Caves", 0)
+    // age.addSymbol("ModBlue", 0)
+    // age.addSymbol("ColorGrass", 0)
+    // age.addSymbol("Obelisks", 0)
+    // age.addSymbol("Dungeons", 0)
+    // age.addSymbol("SkyRed", 0)
+    // age.addSymbol("FogBlue", 0)
+    val fixedSymbols = Array(
+      "DenseOres", "Caves", "LightingNormal"
+      // "LakesSurface",
+      // "ModMat_tile.oreDiamond",
+      // "ModMat_tile.grass",
+      // "ModMat_tile.sponge",
+      // "TerrainEnd", "ModYellow",
+      // "ColorSky", "BiomeSwampland", "BioConSingle",
+      // "ModGreen", "ColorWater", "ModMat_tile.stoneMoss", "GenSpikes"
+    ) map Page.createSymbolPage
+    args match {
+      case Array(_) => {
+        age setAgeName "le bullshit"
       }
 
-      Some(center.instead(_.y = minHeight))
-    }
+      case Array(_, name) => {
+        age setAgeName name
+        age setPages fixedSymbols.toList.asJava.asInstanceOf[java.util.List[ItemStack]]
+      }
 
-    def spawnHouseAt(location: Vector3[Int]) = {
-      structure.placeAt(world, location)
-    }
-
-    // Search 100 blocks in either direction (make this a parameter later, probably)
-    val radius = 100
-
-    for (checkX <- start.x - radius until start.x + radius)
-    for (checkZ <- start.z - radius until start.z + radius) {
-      acceptableCenterAt(new Vector3[Int](checkX, start.y, checkZ)) match {
-        case Some(result) => {
-          spawnHouseAt(result)
-          return
-        }
-
-        case None => {}
+      case Array(_, name, symbols@_*) => {
+        age.setAgeName(name)
+        age setPages (fixedSymbols ++ symbols.map(Page.createSymbolPage)).toList.asJava.asInstanceOf[java.util.List[ItemStack]]
       }
     }
 
-    player chat "OMG no dice...."
-    Sburb log "DUDE tried to spawn house but no fucking luck."
+    link.setDimensionUID(dimensionId)
+    InternalAPI.linking.linkEntity(player, link)
+
+    // player.setPositionAndUpdate(0, 200, 0)
   }
 
 	class TestPacket extends ActivePacket {

@@ -35,6 +35,9 @@ class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {
   def foreach(f: (T) => Unit) = {
     f(x);f(y);f(z)
   }
+  def map[R](f: (T) => R): Vector3[R] = {
+    new Vector3(f(x), f(y), f(z))
+  }
   def tupMap[R](f: (T) => R): (R,R,R) = {
     (f(x), f(y), f(z))
   }

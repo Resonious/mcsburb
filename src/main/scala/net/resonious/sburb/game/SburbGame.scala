@@ -218,6 +218,11 @@ object SburbGame {
     
     def name = n
     var server, client = ""
+    var mediumId = 0
+    // Assigned by teleporting to medium, accessed in SburbProperties#onJoin.
+    // This is in case the player crashes while house is generating.
+    var spawnPointDirty = false
+    var houseCurrentlyBeingMoved = false
 
     val grist = new HashMap[Grist.Value, Long]
     val house: PlayerHouse = h
@@ -250,12 +255,16 @@ object SburbGame {
   }
   
   class PlayerHouse(_name:String, world: World) extends Serializable {
-    // TODO hopefully assigning this spawn variable won't be too difficult......
     var _spawn: Vector3[Int] = new Vector3[Int]
     var minX: Int = 0
     var maxX: Int = 0
     var minZ: Int = 0
     var maxZ: Int = 0
+    var minY: Int = 0
+    var centerY: Int = 0
+
+    // Flag for SburbServerMode to know when to refetch spawn and dimension
+    var wasMoved = false
 
     @transient val rand = new Random
 
@@ -265,9 +274,7 @@ object SburbGame {
       r - r/2
     }
 
-    try {
-      val struct = Structure.load("houses/"+_name+".sst")
-
+    def placeIntoWorld(struct: Structure, world: World) = {
       // Right here... Place the house.
       var tryCount = 1
       var found = false
@@ -285,24 +292,28 @@ object SburbGame {
             maxX = point.x + struct.centerOffset.x
             minZ = point.z - struct.centerOffset.z
             maxZ = point.z + struct.centerOffset.z
-
-            val minSize = 26
-            val halfMinSize = minSize / 2
-
-            val xDif = maxX - minX
-            if (xDif < minSize) {
-              maxX += halfMinSize - xDif
-              minX -= halfMinSize - xDif
-            }
-            val zDif = maxZ - minZ
-            if (zDif < minSize) {
-              maxZ += halfMinSize - zDif
-              minZ -= halfMinSize - zDif
-            }
+            centerY = struct.centerOffset.y
+            minY = point.y - struct.centerOffset.y
 
             _spawn.y = point.y + 5
             _spawn.x = minX
             _spawn.z = minZ
+
+            val minSize = 20
+            val halfMinSize = minSize / 2
+
+            val xDif = maxX - minX
+            val halfXDif = xDif / 2
+            if (xDif < minSize) {
+              maxX += halfMinSize - halfXDif
+              minX -= halfMinSize - halfXDif
+            }
+            val zDif = maxZ - minZ
+            val halfZDif = zDif / 2
+            if (zDif < minSize) {
+              maxZ += halfMinSize - halfZDif
+              minZ -= halfMinSize - halfZDif
+            }
 
             Sburb log "Placing structure..."
             struct.placeAt(world, point, false)
@@ -322,7 +333,11 @@ object SburbGame {
           }
         }
       }
+    }
 
+    try {
+      val struct = Structure.load("houses/"+_name+".sst")
+      placeIntoWorld(struct, world)
     } catch {
       case e: IOException => {
         throw new HouseDoesNotExistException(_name)

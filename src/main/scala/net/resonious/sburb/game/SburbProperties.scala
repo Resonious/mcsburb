@@ -8,6 +8,7 @@ import io.netty.buffer.ByteBuf
 import net.minecraft.entity.Entity
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.entity.player.EntityPlayerMP
+import net.minecraft.util.ChunkCoordinates
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.World
@@ -250,6 +251,14 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
     if (hasGame) {
       serverMode.onJoin()
       if (Sburb.isServer) {
+        if (gameEntry.spawnPointDirty || gameEntry.houseCurrentlyBeingMoved) {
+          val housePos = gameEntry.house.spawn
+          val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
+          player.setSpawnChunk(coords, true, gameEntry.mediumId)
+          gameEntry.spawnPointDirty = false
+          gameEntry.houseCurrentlyBeingMoved = false
+        }
+
         After(3, 'seconds) execute {
           // Why in the devil I have to send this packet twice I do not know.
           gameInfoPacket.send()
