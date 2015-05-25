@@ -18,6 +18,7 @@ object SburbGamePacket {
   // NOTE Okay I repurposed this for house names instead of ids (for the files)
   // and I do not think it is currently used.
 	class NewPlayerPacket extends ActivePacket {
+		throw new SburbException("NewplayerPacket functionality is outdated. Homestuck command should be used.")
 		var houseName = "ryan"
 
 	  @SideOnly(Side.CLIENT)

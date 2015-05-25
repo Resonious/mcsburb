@@ -13,6 +13,8 @@ import net.minecraft.command.ICommandSender
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.block.Block
 import net.minecraft.server.MinecraftServer
+import net.minecraft.item.ItemStack
+import net.resonious.sburb.items.SburbDisc
 import net.minecraft.server.management.ServerConfigurationManager
 import net.minecraft.util.RegistryNamespaced
 import net.minecraft.util.RegistrySimple
@@ -55,16 +57,24 @@ object HomestuckCommand extends ActiveCommand {
       case 1 => Sburb.games.values.iterator.next
       case _ => throw new SburbException("Don't know what to do with more than 1 game yet!")
     }
-    if (!game.newPlayer(player, houseName, true))
-      throw new SburbException("Something went wrong adding "+player.getDisplayName+" to a Sburb game!")
-    else {
-      val housePos = props.gameEntry.house.spawn
-      player.setPositionAndUpdate(
-          housePos.x,
-          housePos.y,
-          housePos.z)
-      val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
-      player.setSpawnChunk(coords, true, 0)
+    if (game.newPlayer(player, houseName, true)) {
+      val house = props.gameEntry.house
+      Sburb log "Generating "+house.name+" for "+player.getCommandSenderName
+      player chat "Generating house..."
+      house onceLoaded { _ =>
+        player.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
+
+        val housePos = props.gameEntry.house.spawn
+        player.setPositionAndUpdate(
+            housePos.x,
+            housePos.y,
+            housePos.z)
+        val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
+        player.setSpawnChunk(coords, true, 0)
+        player chat "Welcome home."
+      }
     }
+    else
+      throw new SburbException("Something went wrong adding "+player.getDisplayName+" to a Sburb game!")
   }
 }
