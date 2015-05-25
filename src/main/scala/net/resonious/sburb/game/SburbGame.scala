@@ -29,6 +29,9 @@ import net.resonious.sburb.Structure
 import net.minecraft.world.World
 import net.minecraft.item.ItemStack
 import net.resonious.sburb.items.SburbDisc
+import net.resonious.sburb.commands.SburbCommand.PlayerWithChat
+
+import com.xcompwiz.mystcraft.api.impl.InternalAPI
 
 class AlreadyHasServerException(plr: SburbGame.PlayerEntry) extends SburbException(
   plr.name + " already has a server player: " + plr.server
@@ -224,6 +227,11 @@ object SburbGame {
     var spawnPointDirty = false
     var houseCurrentlyBeingMoved = false
 
+    // Used by the homestuck command to know where it's at.
+    var houseCurrentlyBeingGenerated = false
+    // Also for homestuck command, so that relogging players can get their disc
+    var needsSburbDisc = false
+
     val grist = new HashMap[Grist.Value, Long]
     val house: PlayerHouse = h
     
@@ -274,22 +282,27 @@ object SburbGame {
       r - r/2
     }
 
+    def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit, takingTooLong: (Int) => Unit): Unit =
+      placeIntoWorld(struct, world, 1, callback, takingTooLong)
+
     def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit): Unit =
-      placeIntoWorld(struct, world, 1, callback)
+      placeIntoWorld(struct, world, 1, callback, null)
 
     def placeIntoWorld(
       struct: Structure,
       world: World,
       tryCount: Int,
-      callback: (Vector3[Int]) => Unit
+      callback: (Vector3[Int]) => Unit,
+      takingTooLong: (Int) => Unit
     ): Unit = {
       // Right here... Place the house.
-      val testPoint = new Vector3[Int](genTestCoord, 200, genTestCoord)
+      val testPoint = new Vector3[Int](genTestCoord, 150, genTestCoord)
 
-      val radius = 10
+      val radius = 50
       Sburb log "Checking ["+testPoint.x+", "+testPoint.y+", "+testPoint.z+"] with a "+radius+" block radius for house spawn point."
 
-      struct.findReasonableSpawnPoint(world, testPoint, radius) onceDone {
+      val acceptWater = InternalAPI.dimension.isMystcraftAge(world.provider.dimensionId)
+      struct.findReasonableSpawnPoint(world, testPoint, radius, acceptWater) onceDone {
         case Some(point) => {
           Sburb log "Found a spot! ["+point.x+", "+point.y+", "+point.z+"]"
 
@@ -332,11 +345,12 @@ object SburbGame {
         case None => {
           Sburb log "Try #"+tryCount+" - couldn't find any good spot."
 
-          if (tryCount >= 100) {
-            throw new SburbException("Tried 10 TIMES TO PLACE A DAMN HOUSE. BRUH.")
+          takingTooLong(tryCount)
+          if (tryCount >= 50) {
+            throw new SburbException("Tried 50 TIMES TO PLACE A DAMN HOUSE. BRUH.")
           }
 
-          placeIntoWorld(struct, world, tryCount + 1, callback)
+          placeIntoWorld(struct, world, tryCount + 1, callback, takingTooLong)
         }
       }
     }
@@ -349,7 +363,8 @@ object SburbGame {
             // Sburb log "PLACED HOUSE"
             if (_onceLoaded != null) _onceLoaded(point)
             // else Sburb log "AND HAD NO CALLBACK!!!!!"
-        })
+        },
+        { i => if (_whenTakingAwhile != null) _whenTakingAwhile(i) })
       } catch {
         case e: IOException => {
           throw new HouseDoesNotExistException(_name)
@@ -358,6 +373,11 @@ object SburbGame {
     }
     @transient var _onceLoaded: (Vector3[Int]) => Unit = null
     def onceLoaded(callback: (Vector3[Int]) => Unit) = _onceLoaded = callback
+
+    // This is kind of a hack so that you can optionally inform the player that
+    // the house is in fact still being generated...
+    @transient var _whenTakingAwhile: (Int) => Unit = null
+    def whenTakingAwhile(callback: (Int) => Unit) = _whenTakingAwhile = callback
 
     // So this now means the file name.
     var name = _name

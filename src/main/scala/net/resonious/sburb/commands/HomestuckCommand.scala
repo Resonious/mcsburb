@@ -12,6 +12,7 @@ import scala.collection.JavaConverters.seqAsJavaListConverter
 import net.minecraft.command.ICommandSender
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.block.Block
+import net.resonious.sburb.game.After
 import net.minecraft.server.MinecraftServer
 import net.minecraft.item.ItemStack
 import net.resonious.sburb.items.SburbDisc
@@ -48,7 +49,10 @@ object HomestuckCommand extends ActiveCommand {
 
     val props = SburbProperties of player
     if (props.hasGame) {
-      player chat "You're already in!"
+      if (props.gameEntry.houseCurrentlyBeingGenerated)
+        player chat "Still working on generating your house, don't worry."
+      else
+        player chat "You're already in!"
       return
     }
 
@@ -58,20 +62,49 @@ object HomestuckCommand extends ActiveCommand {
       case _ => throw new SburbException("Don't know what to do with more than 1 game yet!")
     }
     if (game.newPlayer(player, houseName, true)) {
-      val house = props.gameEntry.house
-      Sburb log "Generating "+house.name+" for "+player.getCommandSenderName
-      player chat "Generating house..."
-      house onceLoaded { _ =>
-        player.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
+      // Keep track of this in case the player dies or something during the process...
+      val playerName = player.getCommandSenderName
+      // Keep track of game entry separately from properties for same reason.
+      val gameEntry = props.gameEntry
+      val house = gameEntry.house
 
-        val housePos = props.gameEntry.house.spawn
-        player.setPositionAndUpdate(
-            housePos.x,
-            housePos.y,
-            housePos.z)
-        val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
-        player.setSpawnChunk(coords, true, 0)
-        player chat "Welcome home."
+      gameEntry.houseCurrentlyBeingGenerated = true
+
+      Sburb log "Generating "+house.name+" for "+player.getCommandSenderName
+      player chat "Generating house... Might take awhile."
+
+      house onceLoaded { _ =>
+        gameEntry.houseCurrentlyBeingGenerated = false
+
+        Sburb playerOfName playerName match {
+          case null => {
+            gameEntry.needsSburbDisc = true
+            gameEntry.spawnPointDirty = true
+            Sburb log "Finished house for "+playerName+". They will be there once they log back on."
+          }
+
+          case player => {
+            player.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
+
+            val housePos = props.gameEntry.house.spawn
+            player.setPositionAndUpdate(
+                housePos.x,
+                housePos.y,
+                housePos.z)
+            val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
+            player.setSpawnChunk(coords, true, 0)
+            After(1, 'second) execute { player chat "Welcome home." }
+          }
+        }
+      }
+      house whenTakingAwhile { numberOfAttempts =>
+        try if (numberOfAttempts == 1 || numberOfAttempts % 3 == 0)
+            player chat "Don't worry, still working on it..."
+          else if (numberOfAttempts == 5)
+            player chat "Sometimes this just takes an absurd amount of time. I'm sorry."
+        catch {
+          case e: Throwable =>
+        }
       }
     }
     else
