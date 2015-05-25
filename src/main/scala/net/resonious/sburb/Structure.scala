@@ -17,6 +17,7 @@ import li.cil.oc
 import net.minecraft.item.ItemStack
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.game.After
+import net.resonious.sburb.game.TimedEvent
 import net.minecraftforge.common.DimensionManager
 import io.netty.buffer.ByteBuf
 import cpw.mods.fml.relauncher.SideOnly
@@ -438,50 +439,42 @@ class Structure(
     out.close()
   }
 
+  abstract class Progress
+  case class NotDoneYet()                  extends Progress
+  case class Found(position: Vector3[Int]) extends Progress
+  case class NothingFound(remaining: Int)  extends Progress
 
-  def findReasonableSpawnPoint(world: World, start: Vector3[Int], radius: Int): Option[Vector3[Int]] = {
-    // Gonna be a bumpy ride...
-    def blockAt(s: Vector3[Int]) = world.getBlock(s.x, s.y, s.z)
-
-    // Ignore and trees, for now.
-    def ignoreBlockAt(s: Vector3[Int]) = {
-      val block = blockAt(s)
-
-      world.isAirBlock(s.x, s.y, s.z) ||
-      block.isInstanceOf[BlockWood]   ||
-      block.isInstanceOf[BlockLeaves]
-    }
-
-    def heightAt(s: Vector3[Int]): Int =
-      if (ignoreBlockAt(s))
-        if (ignoreBlockAt(s.instead(_.y -= 1)))
-          heightAt(s.instead( _.y -= 1 ))
-        else
-          s.y
-      else
-        heightAt(s.instead( _.y += 1 ))
+  class FindReasonableSpawnPointProgress(
+    world:  World,
+    start:  Vector3[Int],
+    radius: Int,
+    struct: Structure
+  ) extends TimedEvent {
+    // Assign this to actually use the result
+    var callback: (Option[Vector3[Int]]) => Unit = null
+    // Change this to scan more or less blocks each tick.
+    var blocksPerTick = 1000000
 
     // Cache of heights and also whether or not the height above a water block.
     var heights = new HashMap[(Int, Int), (Int, Boolean)]
 
-    // Estimate of top-down structure area - we assume the structure has some
-    // padding in it (that its bounds are greater than the actual thing contained)
-    // and so we use 3.5 instead of 4, arbitrarily.
-    val structArea = 3.5 * centerOffset.x * centerOffset.z
-    // Accept up to 1/16th of the approx structure area of extremes.
-    val extremesTolerance = structArea / 16
+    // This must be called (otherwise all the work is for nothing!!!)
+    def onceDone(cb: (Option[Vector3[Int]]) => Unit): FindReasonableSpawnPointProgress = {
+      callback = cb
+      begin()
+      this
+    }
 
-    // Accept up to 1/4th of the ground below the structure to be water.
-    val watersTolerance = structArea / 4
+    class CenterChecker(
+      center:       Vector3[Int],
+      centerOffset: Vector3[Int],
+      world:        World,
+      heights:      HashMap[(Int, Int), (Int, Boolean)]
+    ) {
+      var curPos: Vector3[Int] = null
 
-    // This will get called tonnnnnnnnnns of times. Returns a position with the same
-    // x and z coords as input, and y value of the smallest (sane) height recorded
-    // during the scan IF it determines the given center is deemed suitable.
-    def acceptableCenterAt(center: Vector3[Int]): Option[Vector3[Int]] = {
-      var curPos = new Vector3[Int](center)
-
-      var maxHeight = heightAt(curPos)
-      var minHeight = maxHeight
+      var maxHeight = -1
+      var minHeight = -1
 
       // We'll call any sudden large drop or rise in block height an "extreme".
       // Too many of these, and we will consider this an center unacceptable.
@@ -490,58 +483,177 @@ class Structure(
       // Count how many ground blocks are water. We don't want houses on rivers or lakes.
       var waters = 0
 
-      // Assume the x/z of centerOffset is effectively the "radius" of the
-      // structure's top-down area.
-      for (xOffset <- -centerOffset.x to centerOffset.x)
-      for (zOffset <- -centerOffset.z to centerOffset.z) {
-        curPos = center instead { s => s.x += xOffset; s.z += zOffset }
+      var xOffset = -1
+      var zOffset = -1
 
-        val heightInfo = heights.get((curPos.x, curPos.z)) match {
-          case Some(values) => values
+      def setTo(newCenter: Vector3[Int]) = {
+        curPos = new Vector3[Int](newCenter)
+        maxHeight = heightAt(curPos)
+        minHeight = maxHeight
+        extremes = 0
+        waters = 0
+        xOffset = -centerOffset.x
+        zOffset = -centerOffset.z
+      }
 
-          case None => {
-            val h = heightAt(curPos)
-            val b = blockAt(curPos.instead(_.y = h - 1))
-            val bIsWater = b.getMaterial == Material.water
+      setTo(center)
 
-            heights((curPos.x, curPos.z)) = (h, bIsWater)
-            (h, bIsWater)
+      // Estimate of top-down structure area - we assume the structure has some
+      // padding in it (that its bounds are greater than the actual thing contained)
+      // and so we use 3.5 instead of 4, arbitrarily.
+      val structArea = 3.5 * centerOffset.x * centerOffset.z
+      Sburb log "House area estimate: "+structArea
+      // Accept up to 1/16th of the approx structure area of extremes.
+      val extremesTolerance = structArea / 16
+
+      // Accept up to 1/4th of the ground below the structure to be water.
+      val watersTolerance = structArea / 4
+
+      def blockAt(s: Vector3[Int]) = world.getBlock(s.x, s.y, s.z)
+
+      // Ignore air and trees, for now.
+      def ignoreBlockAt(s: Vector3[Int]) = {
+        val block = blockAt(s)
+
+        world.isAirBlock(s.x, s.y, s.z) ||
+        block.isInstanceOf[BlockWood]   ||
+        block.isInstanceOf[BlockLeaves]
+      }
+
+      def heightAt(s: Vector3[Int]): Int =
+        if (ignoreBlockAt(s))
+          if (ignoreBlockAt(s.instead(_.y -= 1)))
+            heightAt(s.instead( _.y -= 1 ))
+          else
+            s.y
+        else
+          heightAt(s.instead( _.y += 1 ))
+
+      def scan(numBlocks: Int): Progress = {
+        for (i <- 0 until numBlocks) {
+          curPos = center instead { s => s.x += xOffset; s.z += zOffset }
+
+          val heightInfo = heights.get((curPos.x, curPos.z)) match {
+            case Some(values) => values
+
+            case None => {
+              val h = heightAt(curPos)
+              val b = blockAt(curPos.instead(_.y = h - 1))
+              val bIsWater = b.getMaterial == Material.water
+
+              heights((curPos.x, curPos.z)) = (h, bIsWater)
+              (h, bIsWater)
+            }
+          }
+
+          // === Check if we're over too much water ===
+          val isWater = heightInfo match { case (_, b) => b }
+
+          if (isWater) waters += 1
+          if (waters > watersTolerance){
+            // Sburb log "Too much water..."
+            return NothingFound(numBlocks - i)
+          }
+
+          // === Make sure terrain is still acceptable ===
+          val height = heightInfo match { case (h, _) => h }
+
+          // If we encounter an extreme, don't count it toward min/max height
+          if (height - maxHeight > 5) {
+            extremes += 1
+          } else if (minHeight - height > 5) {
+            extremes += 1
+          }
+          else if (height < minHeight) minHeight = height
+          else if (height > maxHeight) maxHeight = height
+
+          if (extremes > extremesTolerance) {
+            // Sburb log "Too many extremes..."
+            return NothingFound(numBlocks - i)
+          }
+          else if (maxHeight - minHeight > 6) {
+            // Sburb log "Too much height difference..."
+            return NothingFound(numBlocks - i)
+          }
+
+          // ======================================= //
+          zOffset += 1
+          if (zOffset > centerOffset.z) {
+            zOffset = -centerOffset.z
+            xOffset += 1
+          }
+
+          if (xOffset > centerOffset.x) return Found(center.instead(_.y = minHeight))
+        }
+        NotDoneYet()
+      }
+    }
+
+    var begun = false
+    def begin(): Unit = {
+      if (begun) return
+      TimedEvent.timedEvents += this
+      begun = true
+    }
+
+    var checkX = start.x - radius
+    var checkZ = start.z - radius
+
+    def curCenter = new Vector3[Int](checkX, start.y, checkZ)
+
+    var centerProgress = new CenterChecker(curCenter, struct.centerOffset, world, heights)
+
+    var tickCount = 0
+    def tick(): Boolean = {
+      // False to tell TimedEvent that we're not done yet. (unless scan decides otherwise)
+      var exit = false
+
+      tickCount += 1
+
+      def scan(blocks: Int): Unit = {
+        centerProgress.scan(blocks) match {
+          case NotDoneYet() => {}
+          case NothingFound(remaining) => {
+            // ========================= //
+            checkZ += 1
+            if (checkZ > start.z + radius) {
+              checkZ = -radius
+              checkX += 1
+            }
+
+            // Since we're scanning z's and then x's, we are done when our x surpasses
+            // the radius.
+            if (checkX > start.x + radius) {
+              if (callback != null) callback(None) // None indicating that we didn't find a good center.
+              else throw new SburbException("No callback specified for async center scan")
+              exit = true; return // Returning true signals TimedEvent to stop executing us.
+            }
+
+            // If our x didn't surpass radius, reset our center checker and try again next tick!
+            centerProgress.setTo(curCenter)
+            scan(remaining)
+          }
+
+          case Found(result) => {
+            Sburb log "FOUND"
+            // It's up to callback to actually do something with the result!
+            if (callback != null) callback(Some(result))
+            else throw new SburbException("No callback specified for async center scan")
+            exit = true; return
           }
         }
-
-        // === Check if we're over too much water ===
-        val isWater = heightInfo match { case (_, b) => b }
-
-        if (isWater) waters += 1
-        if (waters > watersTolerance) return None
-
-        // === Make sure terrain is still acceptable ===
-        val height = heightInfo match { case (h, _) => h }
-
-        // If we encounter an extreme, don't count it toward min/max height
-        if (height - maxHeight > 5) {
-          extremes += 1
-        } else if (minHeight - height > 5) {
-          extremes += 1
-        }
-        else if (height < minHeight) minHeight = height
-        else if (height > maxHeight) maxHeight = height
-
-        if (extremes > extremesTolerance) return None
-        else if (maxHeight - minHeight > 6) return None
       }
+      scan(blocksPerTick)
 
-      Some(center.instead(_.y = minHeight))
+      if (exit) Sburb log "Took "+tickCount+" ticks...."
+      exit
     }
+  }
 
-    for (checkX <- start.x - radius until start.x + radius)
-    for (checkZ <- start.z - radius until start.z + radius) {
-      acceptableCenterAt(new Vector3[Int](checkX, start.y, checkZ)) match {
-        case None => {}
-        case result => return result
-      }
-    }
-
-    None
+  // A callback must be specified like so:
+  // findReasonableSpawnPoint(<args>) onceDone { case None => ... }
+  // Or whatever. As long as you call onceDone with a valid lambda before it finishes.
+  def findReasonableSpawnPoint(world: World, start: Vector3[Int], radius: Int): FindReasonableSpawnPointProgress = {
+    new FindReasonableSpawnPointProgress(world, start, radius, this)
   }
 }

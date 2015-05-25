@@ -274,80 +274,95 @@ object SburbGame {
       r - r/2
     }
 
-    def placeIntoWorld(struct: Structure, world: World) = {
+    def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit): Unit =
+      placeIntoWorld(struct, world, 1, callback)
+
+    def placeIntoWorld(
+      struct: Structure,
+      world: World,
+      tryCount: Int,
+      callback: (Vector3[Int]) => Unit
+    ): Unit = {
       // Right here... Place the house.
-      var tryCount = 1
-      var found = false
+      val testPoint = new Vector3[Int](genTestCoord, 200, genTestCoord)
 
-      while (!found) {
-        val testPoint = new Vector3[Int](genTestCoord, 200, genTestCoord)
+      val radius = 10
+      Sburb log "Checking ["+testPoint.x+", "+testPoint.y+", "+testPoint.z+"] with a "+radius+" block radius for house spawn point."
 
-        Sburb log "Checking ["+testPoint.x+", "+testPoint.y+", "+testPoint.z+"] with a 500 block radius for house spawn point."
+      struct.findReasonableSpawnPoint(world, testPoint, radius) onceDone {
+        case Some(point) => {
+          Sburb log "Found a spot! ["+point.x+", "+point.y+", "+point.z+"]"
 
-        struct.findReasonableSpawnPoint(world, testPoint, 500) match {
-          case Some(point) => {
-            Sburb log "Found a spot! ["+point.x+", "+point.y+", "+point.z+"]"
+          minX = point.x - struct.centerOffset.x
+          maxX = point.x + struct.centerOffset.x
+          minZ = point.z - struct.centerOffset.z
+          maxZ = point.z + struct.centerOffset.z
+          centerY = struct.centerOffset.y
+          minY = point.y - struct.centerOffset.y
 
-            minX = point.x - struct.centerOffset.x
-            maxX = point.x + struct.centerOffset.x
-            minZ = point.z - struct.centerOffset.z
-            maxZ = point.z + struct.centerOffset.z
-            centerY = struct.centerOffset.y
-            minY = point.y - struct.centerOffset.y
+          _spawn.y = point.y + 5
+          _spawn.x = minX
+          _spawn.z = minZ
 
-            _spawn.y = point.y + 5
-            _spawn.x = minX
-            _spawn.z = minZ
+          // Some houses are small and not comfortable for the server player to move
+          // around within the boundary.
+          val minSize = 20
+          val halfMinSize = minSize / 2
 
-            val minSize = 20
-            val halfMinSize = minSize / 2
-
-            val xDif = maxX - minX
-            val halfXDif = xDif / 2
-            if (xDif < minSize) {
-              maxX += halfMinSize - halfXDif
-              minX -= halfMinSize - halfXDif
-            }
-            val zDif = maxZ - minZ
-            val halfZDif = zDif / 2
-            if (zDif < minSize) {
-              maxZ += halfMinSize - halfZDif
-              minZ -= halfMinSize - halfZDif
-            }
-
-            Sburb log "Placing structure..."
-            struct.placeAt(world, point, false)
-            Sburb log "Done."
-
-            found = true
+          val xDif = maxX - minX
+          val halfXDif = xDif / 2
+          if (xDif < minSize) {
+            maxX += halfMinSize - halfXDif
+            minX -= halfMinSize - halfXDif
+          }
+          val zDif = maxZ - minZ
+          val halfZDif = zDif / 2
+          if (zDif < minSize) {
+            maxZ += halfMinSize - halfZDif
+            minZ -= halfMinSize - halfZDif
           }
 
-          case None => {
-            tryCount += 1
+          Sburb log "Placing structure..."
+          struct.placeAt(world, point, false)
+          Sburb log "Done."
+          
+          if (callback != null) callback(point)
+        }
 
-            Sburb log "Try #"+tryCount+" - couldn't find any good spot."
+        case None => {
+          Sburb log "Try #"+tryCount+" - couldn't find any good spot."
 
-            if (tryCount >= 10) {
-              throw new SburbException("Tried 10 TIMES TO PLACE A DAMN HOUSE. BRUH.")
-            }
+          if (tryCount >= 100) {
+            throw new SburbException("Tried 10 TIMES TO PLACE A DAMN HOUSE. BRUH.")
           }
+
+          placeIntoWorld(struct, world, tryCount + 1, callback)
         }
       }
     }
 
-    try {
-      val struct = Structure.load("houses/"+_name+".sst")
-      placeIntoWorld(struct, world)
-    } catch {
-      case e: IOException => {
-        throw new HouseDoesNotExistException(_name)
+    def load() = {
+      try {
+        val struct = Structure.load("houses/"+_name+".sst")
+        placeIntoWorld(struct, world, {
+          point =>
+            // Sburb log "PLACED HOUSE"
+            if (_onceLoaded != null) _onceLoaded(point)
+            // else Sburb log "AND HAD NO CALLBACK!!!!!"
+        })
+      } catch {
+        case e: IOException => {
+          throw new HouseDoesNotExistException(_name)
+        }
       }
     }
+    @transient var _onceLoaded: (Vector3[Int]) => Unit = null
+    def onceLoaded(callback: (Vector3[Int]) => Unit) = _onceLoaded = callback
 
     // So this now means the file name.
     var name = _name
 
-    var spawn: Vector3[Int] = _spawn
+    def spawn: Vector3[Int] = _spawn
     
     @transient lazy val maxFields = getClass.getDeclaredFields filter { 
       _.getName contains "max" }
@@ -484,11 +499,10 @@ class SburbGame(gid: String = "") extends Serializable {
       case s: String => new PlayerHouse(s, entityPlr.worldObj)
       case h: PlayerHouse => h
     }
+    house.load()
 
-    entityPlr.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
-    
     val newEntry = new PlayerEntry(name, house)
-    
+
     newEntry.game = this
     players.put(name, newEntry)
     checkPlayerGrist(newEntry)

@@ -25,6 +25,7 @@ import net.resonious.sburb.game.grist._
 import net.resonious.sburb.items.SburbDisc
 import net.minecraft.block.Block
 import net.resonious.sburb.game.After
+import net.resonious.sburb.game.TimedEvent
 import net.resonious.sburb.packets.ActivePacket
 import net.resonious.sburb.abstracts.Pimp._
 import net.minecraft.world.World
@@ -250,11 +251,11 @@ object FmlEvents {
   // Server:
   @SubscribeEvent
   def onTick(event: TickEvent.ServerTickEvent) = {
-    After.tick()
+    TimedEvent.tick()
   }
   // Client:
   @SubscribeEvent
-  def onTick(event: TickEvent.ClientTickEvent) = After.tick()
+  def onTick(event: TickEvent.ClientTickEvent) = TimedEvent.tick()
 
   @SideOnly(Side.CLIENT)
 	@SubscribeEvent

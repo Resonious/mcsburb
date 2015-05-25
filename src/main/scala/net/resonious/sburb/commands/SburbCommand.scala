@@ -296,35 +296,43 @@ object SburbCommand extends ActiveCommand {
     playerEntry.mediumId = dimensionId
     // Events.scala makes the player invincible while houseCurrentlyBeingMoved is
     // true. This makes them not die from fall damage here.
+    // (Except it doesn't work) (This is also accessed by other things)
+    // (None of which actually work I'm guessing)
     playerEntry.houseCurrentlyBeingMoved = true
+    // Because the player hurt event won't do it, we'll try this....
+    player setInvisible true
+    player.capabilities.allowFlying = true
+    player.capabilities.isFlying    = true
+
     Sburb.warpPlayer(player, dimensionId, new Vector3(0, 100, 0))
 
-    val newWorld = DimensionManager.getWorld(dimensionId)
-    val ticket = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
+    val newWorld       = DimensionManager.getWorld(dimensionId)
+    val ticket         = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
     val forceLoadChunk = new ChunkCoordIntPair(0, 0)
     ForgeChunkManager.forceChunk(ticket, forceLoadChunk)
 
-    After(5, 'seconds) execute {
-      Sburb log "PLACING HOUSE INTO MEDIUM"
-      house.placeIntoWorld(savedHouse, newWorld)
-      house.wasMoved = true
-      Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
+    Sburb log "PLACING HOUSE INTO MEDIUM"
+    house.placeIntoWorld(savedHouse, newWorld, {
+      case p => {
+        house.wasMoved = true
+        Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
 
-      // TODO unsure if this is any good
-      playerEntry.spawnPointDirty = true
+        // TODO unsure if this is any good
+        playerEntry.spawnPointDirty = true
 
-      val housePos = house.spawn
-      player.setPositionAndUpdate(
-          housePos.x,
-          housePos.y,
-          housePos.z)
-      val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
-      player.setSpawnChunk(coords, true, dimensionId)
+        val housePos = house.spawn
+        val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
+        player.setSpawnChunk(coords, true, dimensionId)
+        player setInvisible false
+        player.capabilities.allowFlying = false
+        player.capabilities.isFlying    = false
+        housePos applyTo player
 
-      Sburb log "SET PLAYER'S SPAWN POINT IN MEDIUM"
-      playerEntry.houseCurrentlyBeingMoved = false
-      ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
-    }
+        Sburb log "SET PLAYER'S SPAWN POINT IN MEDIUM"
+        playerEntry.houseCurrentlyBeingMoved = false
+        ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
+      }
+    })
   }
 
   @Command
