@@ -43,6 +43,7 @@ import net.resonious.sburb.game.grist.GristShopItemRenderer
 import com.xcompwiz.mystcraft.api.impl.InternalAPI
 import net.minecraft.util.ChunkCoordinates
 import net.minecraft.entity.player.EntityPlayer
+import net.minecraft.entity.EntityLivingBase
 import net.dinkyman.sburb.DMain
 
 @Mod(modid = "sburb", version = "0.0.0", modLanguage = "scala",
@@ -75,13 +76,16 @@ object Sburb {
   }
 
   def warpPlayer(player: EntityPlayer, dim: Int, to: Vector3[Int]): Unit = {
-    if (player.worldObj.provider.dimensionId != dim) {
-      val link = InternalAPI.linking.createLinkInfoFromPosition(player.worldObj, player)
+    warpEntity(player, dim, to)
+  }
+  def warpEntity(entity: EntityLivingBase, dim: Int, to: Vector3[Int]): Unit = {
+    if (entity.worldObj.provider.dimensionId != dim) {
+      val link = InternalAPI.linking.createLinkInfoFromPosition(entity.worldObj, entity)
       link.setDimensionUID(dim)
       link.setSpawn(new ChunkCoordinates(to.x, to.y, to.z))
-      InternalAPI.linking.linkEntity(player, link)
+      InternalAPI.linking.linkEntity(entity, link)
     } else {
-      player.setPositionAndUpdate(to.x, to.y, to.z)
+      entity.setPositionAndUpdate(to.x, to.y, to.z)
     }
   }
 

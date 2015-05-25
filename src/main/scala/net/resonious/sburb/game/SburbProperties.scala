@@ -15,10 +15,12 @@ import net.minecraft.world.World
 import net.minecraftforge.common.IExtendedEntityProperties
 import net.resonious.sburb.Sburb
 import net.resonious.sburb.abstracts._
+import net.minecraft.item.ItemStack
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.commands.SburbCommand._
 import net.resonious.sburb.game.grist._
 import net.resonious.sburb.packets.ActivePacket
+import net.resonious.sburb.items.SburbDisc
 import cpw.mods.fml.relauncher.Side
 import cpw.mods.fml.relauncher.SideOnly
 import scala.collection.mutable.HashMap
@@ -251,12 +253,19 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
     if (hasGame) {
       serverMode.onJoin()
       if (Sburb.isServer) {
-        if (gameEntry.spawnPointDirty || gameEntry.houseCurrentlyBeingMoved) {
+        if (gameEntry.spawnPointDirty) {
           val housePos = gameEntry.house.spawn
           val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
           player.setSpawnChunk(coords, true, gameEntry.mediumId)
+          // So yeah, if someone immediately logs out after logging in, they'll get fucked.
+          After(2, 'seconds) execute {
+            Sburb.warpPlayer(player, gameEntry.mediumId, housePos)
+          }
           gameEntry.spawnPointDirty = false
-          gameEntry.houseCurrentlyBeingMoved = false
+        }
+        if (gameEntry.needsSburbDisc) {
+          player.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
+          gameEntry.needsSburbDisc = false
         }
 
         After(3, 'seconds) execute {
@@ -264,15 +273,6 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
           gameInfoPacket.send()
           After(5, 'ticks) execute gameInfoPacket.send
         }
-      }
-    } else {
-      // TODO make absolutly sure death doesn't screw this up
-      After(2, 'seconds) execute {
-        if (!hasGame && !SburbGame.defaultSpawn.isZero)
-          player.setPositionAndUpdate(
-            SburbGame.defaultSpawn.x,
-            SburbGame.defaultSpawn.y,
-            SburbGame.defaultSpawn.z)
       }
     }
   }

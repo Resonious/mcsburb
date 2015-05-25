@@ -97,11 +97,9 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
       event.entity match {
         case player: EntityPlayer => {
           val props = SburbProperties of player
-          if (props.hasGame && (props.gameEntry.houseCurrentlyBeingMoved || props.serverMode.activated)) {
-            // Sburb log "DEFLECT HURT"
+          if (props.hasGame && props.serverMode.activated) {
             event setCanceled true
           }
-          // else Sburb log "AN ENTITY WAS REALLY HURT!!!!!"
         }
         case _ =>
       }

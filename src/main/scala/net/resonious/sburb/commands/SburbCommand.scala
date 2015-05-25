@@ -1,5 +1,6 @@
 package net.resonious.sburb.commands
 
+import net.minecraft.entity.passive.EntityPig
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import scala.collection.JavaConverters.seqAsJavaListConverter
@@ -222,6 +223,9 @@ object SburbCommand extends ActiveCommand {
       player chat "No sburb game!"
       return
     }
+    if (props.gameEntry.houseCurrentlyBeingMoved) {
+      player chat "Your medium is still being generated. No worries."
+    }
 
     val serverPlayer = props.gameEntry.serverPlayer
     if (serverPlayer != null) {
@@ -294,45 +298,49 @@ object SburbCommand extends ActiveCommand {
       .asInstanceOf[java.util.List[ItemStack]]
 
     playerEntry.mediumId = dimensionId
-    // Events.scala makes the player invincible while houseCurrentlyBeingMoved is
-    // true. This makes them not die from fall damage here.
-    // (Except it doesn't work) (This is also accessed by other things)
-    // (None of which actually work I'm guessing)
+    // Keeping this flag around so that maybe we can tell the player that it's being worked on
+    // if they're antsy and clicking buttons a lot.
     playerEntry.houseCurrentlyBeingMoved = true
-    // Because the player hurt event won't do it, we'll try this....
-    player setInvisible true
-    player.capabilities.allowFlying = true
-    player.capabilities.isFlying    = true
 
-    Sburb.warpPlayer(player, dimensionId, new Vector3(0, 100, 0))
+    // Force Mystcraft to generate the world,
+    val dummyPig = new EntityPig(player.worldObj)
+    Sburb.warpEntity(dummyPig, dimensionId, new Vector3(0, 50, 0))
 
     val newWorld       = DimensionManager.getWorld(dimensionId)
     val ticket         = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
     val forceLoadChunk = new ChunkCoordIntPair(0, 0)
+    // Keep player name around in case they log out/die/yadda yadda
+    val playerName     = player.getCommandSenderName
+    // Then keep the world alive until we're ready to warp the player.
     ForgeChunkManager.forceChunk(ticket, forceLoadChunk)
 
-    Sburb log "PLACING HOUSE INTO MEDIUM"
-    house.placeIntoWorld(savedHouse, newWorld, {
-      case p => {
-        house.wasMoved = true
-        Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
+    // Give Mystcraft enough time to build the world before scanning the shit out of it.
+    After(5, 'seconds) execute {
+      Sburb log "PLACING HOUSE INTO MEDIUM"
+      house.placeIntoWorld(savedHouse, newWorld, {
+        case p => {
+          // Informs SburbServerMode that whatever position/dimension you have saved is now wrong.
+          house.wasMoved = true
+          playerEntry.houseCurrentlyBeingMoved = false
+          Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
+          ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
 
-        // TODO unsure if this is any good
-        playerEntry.spawnPointDirty = true
+          Sburb playerOfName playerName match {
+            case null => {
+              playerEntry.spawnPointDirty = true
+            }
 
-        val housePos = house.spawn
-        val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
-        player.setSpawnChunk(coords, true, dimensionId)
-        player setInvisible false
-        player.capabilities.allowFlying = false
-        player.capabilities.isFlying    = false
-        housePos applyTo player
+            case player => {
+              val housePos = house.spawn
+              val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
+              player.setSpawnChunk(coords, true, dimensionId)
+              Sburb.warpPlayer(player, dimensionId, housePos)
+            }
+          }
 
-        Sburb log "SET PLAYER'S SPAWN POINT IN MEDIUM"
-        playerEntry.houseCurrentlyBeingMoved = false
-        ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
-      }
-    })
+        }
+      })
+    }
   }
 
   @Command

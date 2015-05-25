@@ -448,12 +448,13 @@ class Structure(
     world:  World,
     start:  Vector3[Int],
     radius: Int,
+    acceptWaterAsGround: Boolean,
     struct: Structure
   ) extends TimedEvent {
     // Assign this to actually use the result
     var callback: (Option[Vector3[Int]]) => Unit = null
     // Change this to scan more or less blocks each tick.
-    var blocksPerTick = 1000000
+    var blocksPerTick = 10
 
     // Cache of heights and also whether or not the height above a water block.
     var heights = new HashMap[(Int, Int), (Int, Boolean)]
@@ -469,9 +470,32 @@ class Structure(
       center:       Vector3[Int],
       centerOffset: Vector3[Int],
       world:        World,
-      heights:      HashMap[(Int, Int), (Int, Boolean)]
+      heights:      HashMap[(Int, Int), (Int, Boolean)],
+      var acceptWaterAsGround: Boolean
     ) {
+      // Constants for which line we're currently on
+      final val TOP: Int = 0
+      final val RIGHT: Int = 1
+      final val BOTTOM: Int = 2
+      final val LEFT: Int = 3
+      def dim = curEdge match {
+        case TOP    => 'x
+        case RIGHT  => 'z
+        case BOTTOM => 'x
+        case LEFT   => 'z
+        case _ => throw new SburbException("Not able to get dimension for edge "+curEdge)
+      }
+      def altOffsetFor(edge: Int) = edge match {
+        case TOP    =>  centerOffset.z
+        case RIGHT  =>  centerOffset.x
+        case BOTTOM => -centerOffset.z
+        case LEFT   => -centerOffset.x
+        case _ => throw new SburbException("Not able to get offset for edge "+curEdge)
+      }
+
       var curPos: Vector3[Int] = null
+
+      var curEdge: Int = -1
 
       var maxHeight = -1
       var minHeight = -1
@@ -483,8 +507,10 @@ class Structure(
       // Count how many ground blocks are water. We don't want houses on rivers or lakes.
       var waters = 0
 
-      var xOffset = -1
-      var zOffset = -1
+      var altOffset = -1
+      var offset = -1
+      // var xOffset = -1
+      // var zOffset = -1
 
       def setTo(newCenter: Vector3[Int]) = {
         curPos = new Vector3[Int](newCenter)
@@ -492,22 +518,28 @@ class Structure(
         minHeight = maxHeight
         extremes = 0
         waters = 0
-        xOffset = -centerOffset.x
-        zOffset = -centerOffset.z
+        curEdge = TOP
+        altOffset = altOffsetFor(curEdge)
+        offset = -centerOffset(dim)
+        // xOffset = -centerOffset.x
+        // zOffset = -centerOffset.z
       }
 
       setTo(center)
 
-      // Estimate of top-down structure area - we assume the structure has some
+      // Estimate of top-down structure perimeter - we assume the structure has some
       // padding in it (that its bounds are greater than the actual thing contained)
-      // and so we use 3.5 instead of 4, arbitrarily.
-      val structArea = 3.5 * centerOffset.x * centerOffset.z
-      Sburb log "House area estimate: "+structArea
-      // Accept up to 1/16th of the approx structure area of extremes.
-      val extremesTolerance = structArea / 16
+      // and so we use 1.9 instead of 2, arbitrarily.
+      val structPerimeter = 1.9 * (centerOffset.x + centerOffset.z)
+      Sburb log "House perimeter estimate: "+structPerimeter
+      // Accept up to 1/16th of the approx structure peremeter of extremes.
+      val extremesTolerance = structPerimeter / 16
 
       // Accept up to 1/4th of the ground below the structure to be water.
-      val watersTolerance = structArea / 4
+      val watersTolerance = structPerimeter / 4
+
+      // NOTE we check every 2 blocks - those tolerances are effectively twice what they are
+      // labeled.
 
       def blockAt(s: Vector3[Int]) = world.getBlock(s.x, s.y, s.z)
 
@@ -531,7 +563,8 @@ class Structure(
 
       def scan(numBlocks: Int): Progress = {
         for (i <- 0 until numBlocks) {
-          curPos = center instead { s => s.x += xOffset; s.z += zOffset }
+          // curPos = center instead { s => s.x += xOffset; s.z += zOffset }
+          curPos = center instead { s => s(dim) += offset }
 
           val heightInfo = heights.get((curPos.x, curPos.z)) match {
             case Some(values) => values
@@ -550,7 +583,7 @@ class Structure(
           val isWater = heightInfo match { case (_, b) => b }
 
           if (isWater) waters += 1
-          if (waters > watersTolerance){
+          if (waters > watersTolerance && !acceptWaterAsGround){
             // Sburb log "Too much water..."
             return NothingFound(numBlocks - i)
           }
@@ -577,6 +610,7 @@ class Structure(
           }
 
           // ======================================= //
+          /*
           zOffset += 1
           if (zOffset > centerOffset.z) {
             zOffset = -centerOffset.z
@@ -584,6 +618,15 @@ class Structure(
           }
 
           if (xOffset > centerOffset.x) return Found(center.instead(_.y = minHeight))
+          */
+          offset += 2
+          if (offset > centerOffset(dim)) {
+            curEdge += 1
+            if (curEdge > LEFT) return Found(center.instead(_.y = minHeight))
+            altOffset = altOffsetFor(curEdge)
+
+            offset = -centerOffset(dim)
+          }
         }
         NotDoneYet()
       }
@@ -601,7 +644,7 @@ class Structure(
 
     def curCenter = new Vector3[Int](checkX, start.y, checkZ)
 
-    var centerProgress = new CenterChecker(curCenter, struct.centerOffset, world, heights)
+    var centerProgress = new CenterChecker(curCenter, struct.centerOffset, world, heights, acceptWaterAsGround)
 
     var tickCount = 0
     def tick(): Boolean = {
@@ -609,16 +652,18 @@ class Structure(
       var exit = false
 
       tickCount += 1
+      // Only operate every three ticks
+      if (tickCount % 3 == 0) return false
 
       def scan(blocks: Int): Unit = {
         centerProgress.scan(blocks) match {
           case NotDoneYet() => {}
           case NothingFound(remaining) => {
             // ========================= //
-            checkZ += 1
+            checkZ += struct.centerOffset.z
             if (checkZ > start.z + radius) {
               checkZ = -radius
-              checkX += 1
+              checkX += struct.centerOffset.x
             }
 
             // Since we're scanning z's and then x's, we are done when our x surpasses
@@ -653,7 +698,7 @@ class Structure(
   // A callback must be specified like so:
   // findReasonableSpawnPoint(<args>) onceDone { case None => ... }
   // Or whatever. As long as you call onceDone with a valid lambda before it finishes.
-  def findReasonableSpawnPoint(world: World, start: Vector3[Int], radius: Int): FindReasonableSpawnPointProgress = {
-    new FindReasonableSpawnPointProgress(world, start, radius, this)
+  def findReasonableSpawnPoint(world: World, start: Vector3[Int], radius: Int, acceptWaterAsGround: Boolean): FindReasonableSpawnPointProgress = {
+    new FindReasonableSpawnPointProgress(world, start, radius, acceptWaterAsGround, this)
   }
 }
