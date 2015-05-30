@@ -1,7 +1,10 @@
 package net.resonious.sburb.entities
 
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
 import net.resonious.sburb.abstracts.Vector3
 import net.resonious.sburb.Sburb
+import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.entity.Entity
 import cpw.mods.fml.common.registry.IEntityAdditionalSpawnData
 import net.minecraft.client.renderer.entity.Render
@@ -11,6 +14,7 @@ import org.lwjgl.opengl.GL11
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.util.ResourceLocation
 import scala.math._
+import scala.util.Random
 import net.minecraft.util.ResourceLocation
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderHelper
@@ -49,15 +53,23 @@ object HousePortalRenderer extends Render {
 
   final val thetaMax = 20*Pi
 
-  // TODO move these to the entity or something?
   // Radius of the entire epicycloid
   final val radius: Double = 1.3
-  // Remember baseline shape is at r = ~0.5
-  var r: Double = radius / (1.0 + 11.0/7.0) // ~0.5055555556
-  def kD = (11.0 * r) / (radius - r)
-  def k = 11.0 / kD
+  // kN (k numerator) is a constant prime number so that we don't get any insane dips in
+  // number of cusps.
+  final val kN: Double = 11.0
+  // k = 11/7 looks a lot like the Sburb portals, so that's where we start.
+  final val initial_kD: Double = 7.0
+  // Some algebra on the kD formula down there, so that we can start out at k = 11/7.
+  final val initial_r: Double = radius / (1.0 + kN/initial_kD) // ~0.5055555556
+  // Calculates the denominator of r relative to a given r. If you pass in initial_r, you
+  // should get 7.0!
+  def kD(r: Double) = (kN * r) / (radius - r)
+  // def k(r: Double) = kN / kD(r)
 
   override def doRender(entity: Entity, x: Double, y: Double, z: Double, yaw: Float, dt: Float) = {
+    val r = entity.asInstanceOf[HousePortal].r
+
     GL11.glPushMatrix()
     GL11.glTranslated(x, y, z)
     bindTexture(tex)
@@ -68,20 +80,22 @@ object HousePortalRenderer extends Render {
 
     t.startDrawingQuads()
 
-    def cycloid(theta: Double) =
+    def epicycloid(theta: Double) = {
+      val k = kN / kD(r)
       (
         r*(k + 1)*cos(theta) - r*cos((k + 1)*theta),
         r*(k + 1)*sin(theta) - r*sin((k + 1)*theta)
       )
+    }
 
     var theta = 0.0
     var point1: (Double, Double) = null
     var point2: (Double, Double) = null
     while (theta <= thetaMax) {
       if (point1 == null) {
-        point1 = cycloid(theta)
+        point1 = epicycloid(theta)
       } else {
-        point2 = cycloid(theta)
+        point2 = epicycloid(theta)
 
         // Magnitudes of the points
         // val mag1 = point1.magnitude
@@ -159,10 +173,44 @@ object HousePortalRenderer extends Render {
 
 class HousePortal(world: World, var targetPos: Vector3[Int], var targetDim: Int)
 extends Entity(world) {
+  // Angle used to fluctuate r
+  var r: Double = HousePortalRenderer.initial_r
+  var phi: Double = 0.0
+  var fluxTimeout: Int = 5 * 20
+
   def this(world: World) = this(world, new Vector3[Int](0, 50, 0), 0)
 
   override def entityInit(): Unit = {
+    phi = 0
     Sburb log "PORTAL HAS JOINED THE FIGHT"
+  }
+
+  // TODO we probably need a not-shitty bounding box
+  override def onCollideWithPlayer(player: EntityPlayer): Unit = {
+    // Sburb log "WARP!!!!!!!!!"
+  }
+
+  override def onUpdate(): Unit = {
+    super.onUpdate()
+
+    if (Sburb.isClient) {
+      if (fluxTimeout > 0) {
+        fluxTimeout -= 1
+        return
+      }
+
+      phi += (Pi / 2.0) / 20.0
+
+      if (phi == Pi) {
+        fluxTimeout = 10
+        phi = 0
+      }
+      else if (phi > Pi) {
+        phi = Pi
+      }
+
+      r = HousePortalRenderer.initial_r - 0.2 * sin(phi)
+    }
   }
 
   override def readEntityFromNBT(comp: NBTTagCompound): Unit = {

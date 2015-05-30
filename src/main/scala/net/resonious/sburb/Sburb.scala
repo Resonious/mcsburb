@@ -157,7 +157,7 @@ object Sburb {
     }
 
     // Entities
-    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 16, 5, false)
+    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 60, 5, false)
     if (isClient)
       RenderingRegistry.registerEntityRenderingHandler(classOf[HousePortal], HousePortalRenderer)
 
