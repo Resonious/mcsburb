@@ -25,6 +25,7 @@ import net.resonious.sburb.packets.ActivePacket
 import net.minecraft.client.entity.EntityClientPlayerMP
 import net.resonious.sburb.Structure
 import scala.util.control.Breaks
+import net.resonious.sburb.entities.HousePortal
 import net.minecraft.block.BlockWood
 import net.minecraft.block.BlockLeaves
 import net.minecraft.block.BlockLiquid
@@ -254,7 +255,7 @@ object SburbCommand extends ActiveCommand {
     symbols ++= List("DenseOres", "Caves", "BioConSingle")
 
     val terrain = Array(
-      "TerrainNormal", "TerrainAplified", "TerrainEnd"
+      "TerrainNormal", "TerrainAplified", "TerrainEnd", "Skylands"
     )
     symbols += terrain(rand.nextInt(terrain.length))
 
@@ -399,6 +400,15 @@ object SburbCommand extends ActiveCommand {
     InternalAPI.linking.linkEntity(player, link)
 
     // player.setPositionAndUpdate(0, 200, 0)
+  }
+
+  @Command
+  def spawnportal(player: EntityPlayer) = {
+    val portal = new HousePortal(player.worldObj)
+    portal.setPosition(player.posX, player.posY, player.posZ + 2)
+    player.worldObj.spawnEntityInWorld(portal)
+
+    Sburb log "DONE. Spawned a portal"
   }
 
 	class TestPacket extends ActivePacket {

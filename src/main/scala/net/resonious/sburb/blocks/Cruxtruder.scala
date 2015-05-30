@@ -7,7 +7,7 @@ import net.minecraft.util.ResourceLocation
 import net.minecraft.world.IBlockAccess
 
 object CruxtruderRenderer 
-	extends ActiveTileEntityRenderer(classOf[CruxtruderEntity], Cruxtruder){
+extends ActiveTileEntityRenderer(classOf[CruxtruderEntity], Cruxtruder){
   private val _model = new net.resonious.sburb.models.Cruxtruder
   private val _texture = new ResourceLocation("sburb", "textures/tile_entities/cruxtruder.png")
   

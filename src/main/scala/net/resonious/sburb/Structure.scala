@@ -373,6 +373,10 @@ class Structure(
     }
   }
 
+  // TODO so that we can spawn portals I guess
+  // def offsetToHighestBlock(): Int = {
+  // }
+
   // x and z are the center of the structure's top-down defining area, y is the bottom of the structure.
   def placeAt(world: World, x: Int, y: Int, z: Int, sendPacket: Boolean): Unit = {
     def place(blocks: NBTTagList, i: Int) = {
