@@ -26,6 +26,7 @@ import net.minecraft.client.entity.EntityClientPlayerMP
 import net.resonious.sburb.Structure
 import scala.util.control.Breaks
 import net.resonious.sburb.entities.HousePortal
+import net.resonious.sburb.entities.HousePortalRenderer
 import net.minecraft.block.BlockWood
 import net.minecraft.block.BlockLeaves
 import net.minecraft.block.BlockLiquid
@@ -210,6 +211,42 @@ object SburbCommand extends ActiveCommand {
 	  props.game = null
 	  player chat "Cleared Sburb game data for "+plr.getDisplayName+"!"
 	}
+
+  // For testing house portal epicycloid values
+  @Command
+  def set(player: EntityPlayer, args: Array[String]): Unit = {
+    if (args.length < 3) {
+      player chat "/set varname somenumber"
+      return
+    }
+
+    val varToChange = args(1)
+
+    def setVar(value: Double) = {
+      varToChange match {
+        case "r" => HousePortalRenderer.r = value
+        case _ => player chat "No"
+      }
+    }
+
+    // So, "19/5" should actually become 3.8 or whatever
+    args(2).split('/') match {
+      case Array(p, q) => setVar(p.toDouble/q.toDouble)
+      case Array(a) =>
+        if (a.contains("pi"))
+          setVar(a.split("pi")(0).toDouble * math.Pi)
+        else
+          setVar(a.toDouble)
+    }
+  }
+  // Also for testing house portal renderer
+  @Command
+  def tell(player: EntityPlayer): Unit = {
+    player chat "k = "+HousePortalRenderer.k
+    player chat "r = "+HousePortalRenderer.r
+    player chat "Radius = "+HousePortalRenderer.r*(1+HousePortalRenderer.k)+" (should remain constant)"
+    player chat "thetaMax = "+HousePortalRenderer.thetaMax
+  }
 
   @Command
   def agename(player: EntityPlayer, args: Array[String]): Unit = {

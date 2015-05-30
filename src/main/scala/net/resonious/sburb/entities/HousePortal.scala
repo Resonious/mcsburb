@@ -47,7 +47,16 @@ object HousePortalRenderer extends Render {
     def disp = tup match { case (x, y) => "<"+x+", "+y+">" }
   }
 
-  var printedShit = false
+  final val thetaMax = 20*Pi
+
+  // TODO move these to the entity or something?
+  // Radius of the entire epicycloid
+  final val radius: Double = 1.3
+  // Remember baseline shape is at r = ~0.5
+  var r: Double = radius / (1.0 + 11.0/7.0) // ~0.5055555556
+  def kD = (11.0 * r) / (radius - r)
+  def k = 11.0 / kD
+
   override def doRender(entity: Entity, x: Double, y: Double, z: Double, yaw: Float, dt: Float) = {
     GL11.glPushMatrix()
     GL11.glTranslated(x, y, z)
@@ -59,22 +68,24 @@ object HousePortalRenderer extends Render {
 
     t.startDrawingQuads()
 
-    def magnitude(point: (Double, Double)) =
-      point match { case (x, y) => math.sqrt(pow(x, 2) + pow(y, 2)) }
+    def cycloid(theta: Double) =
+      (
+        r*(k + 1)*cos(theta) - r*cos((k + 1)*theta),
+        r*(k + 1)*sin(theta) - r*sin((k + 1)*theta)
+      )
 
-    val radius = 2.0
     var theta = 0.0
     var point1: (Double, Double) = null
     var point2: (Double, Double) = null
-    while (theta <= 2.0*Pi) {
+    while (theta <= thetaMax) {
       if (point1 == null) {
-        point1 = (radius * cos(theta), radius * sin(theta))
+        point1 = cycloid(theta)
       } else {
-        point2 = (radius * cos(theta), radius * sin(theta))
+        point2 = cycloid(theta)
 
         // Magnitudes of the points
-        val mag1 = point1.magnitude
-        val mag2 = point2.magnitude
+        // val mag1 = point1.magnitude
+        // val mag2 = point2.magnitude
 
         // Angle Between Points
         val abp = (point2 - point1) match {
@@ -95,6 +106,7 @@ object HousePortalRenderer extends Render {
             -sqrt(1 - pow(abs(pCos), 2))
         */
 
+        /*
         if (!printedShit) {
           Sburb log "===================THETA:"+theta+" ======================"
           Sburb log "======POINT 1: "+point1.disp+"========="
@@ -103,14 +115,15 @@ object HousePortalRenderer extends Render {
           Sburb log "Sin between: "+pSin
           Sburb log "---------------------------------------------------------"
         }
+        */
 
         // Rectangle size
-        val r = 0.05
+        val s = 0.025
 
-        val topLeft     = point1 match { case (x, y) => (x + r*pCos, y + r*pSin) }
-        val bottomLeft  = point1 match { case (x, y) => (x - r*pCos, y - r*pSin) }
-        val topRight    = point2 match { case (x, y) => (x + r*pCos, y + r*pSin) }
-        val bottomRight = point2 match { case (x, y) => (x - r*pCos, y - r*pSin) }
+        val topLeft     = point1 match { case (x, y) => (x + s*pCos, y + s*pSin) }
+        val bottomLeft  = point1 match { case (x, y) => (x - s*pCos, y - s*pSin) }
+        val topRight    = point2 match { case (x, y) => (x + s*pCos, y + s*pSin) }
+        val bottomRight = point2 match { case (x, y) => (x - s*pCos, y - s*pSin) }
 
         def vert(y: Double, points: (Double, Double)*) =
           points foreach { _ match { case (x, z) => { t.addVertex(x, y, z) } } }
@@ -127,9 +140,9 @@ object HousePortalRenderer extends Render {
 
         point1 = point2
       }
-      theta += Pi/12
+      theta += Pi/60
     }
-    printedShit = true
+    // printedShit = true
 
     t.draw()
 
