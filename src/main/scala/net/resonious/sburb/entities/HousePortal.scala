@@ -18,6 +18,8 @@ import scala.util.Random
 import net.minecraft.util.ResourceLocation
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderHelper
+import net.resonious.sburb.packets.ActivePacket
+import net.resonious.sburb.abstracts.PacketPipeline
 
 object HousePortalRenderer extends Render {
   lazy val t = Tessellator.instance
@@ -68,15 +70,18 @@ object HousePortalRenderer extends Render {
   // def k(r: Double) = kN / kD(r)
 
   override def doRender(entity: Entity, x: Double, y: Double, z: Double, yaw: Float, dt: Float) = {
-    val r = entity.asInstanceOf[HousePortal].r
+    val portal = entity.asInstanceOf[HousePortal]
+    val r = portal.r
+    val color = portal.color
 
     GL11.glPushMatrix()
     GL11.glTranslated(x, y, z)
     bindTexture(tex)
-    GL11.glColor3f(1f, 0.2f, 0.5f)
+    GL11.glColor3f(color.r, color.g, color.b)
     GL11.glDisable(GL11.GL_BLEND)
 
     mc.entityRenderer.disableLightmap(0)
+    RenderHelper.disableStandardItemLighting()
 
     t.startDrawingQuads()
 
@@ -97,10 +102,6 @@ object HousePortalRenderer extends Render {
       } else {
         point2 = epicycloid(theta)
 
-        // Magnitudes of the points
-        // val mag1 = point1.magnitude
-        // val mag2 = point2.magnitude
-
         // Angle Between Points
         val abp = (point2 - point1) match {
           case (x12, y12) => atan2(y12, x12)
@@ -108,28 +109,6 @@ object HousePortalRenderer extends Render {
         // Rotate 90 degrees
         val pCos = cos(abp + Pi/2)
         val pSin = sin(abp + Pi/2)
-
-        // TODO if things get crazy, maybe do some benchmarking with the atan2 vs.
-        // this weird method:
-        /*
-        val pCos = (point1 dot point2) / (mag1 * mag2)
-        val pSin =
-          if (point1.y < point2.y)
-            sqrt(1 - pow(abs(pCos), 2))
-          else
-            -sqrt(1 - pow(abs(pCos), 2))
-        */
-
-        /*
-        if (!printedShit) {
-          Sburb log "===================THETA:"+theta+" ======================"
-          Sburb log "======POINT 1: "+point1.disp+"========="
-          Sburb log "======POINT 2: "+point2.disp+"========="
-          Sburb log "Cos between: "+pCos
-          Sburb log "Sin between: "+pSin
-          Sburb log "---------------------------------------------------------"
-        }
-        */
 
         // Rectangle size
         val s = 0.025
@@ -146,12 +125,6 @@ object HousePortalRenderer extends Render {
         vert(0.5, topLeft, topRight, bottomRight, bottomLeft)
         vert(0.5, bottomLeft, bottomRight, topRight, topLeft)
 
-        // TODO make a rectangle out of point1 and point2
-        // t.addVertex(x, 0.5, z)
-        // t.addVertex(x, 0.5, z+0.1)
-        // t.addVertex(x+0.1, 0.5, z+0.1)
-        // t.addVertex(x+0.1, 0.5, z)
-
         point1 = point2
       }
       theta += Pi/60
@@ -162,6 +135,7 @@ object HousePortalRenderer extends Render {
 
     GL11.glPopMatrix()
     mc.entityRenderer.enableLightmap(0)
+    RenderHelper.enableStandardItemLighting()
   }
 
   override def getEntityTexture(entity: Entity): ResourceLocation = {
@@ -170,46 +144,49 @@ object HousePortalRenderer extends Render {
 }
 
 // TODO make ActiveEntity or something...?
-
-class HousePortal(world: World, var targetPos: Vector3[Int], var targetDim: Int)
-extends Entity(world) {
-  // Angle used to fluctuate r
+class HousePortal(
+  world: World,
+  var targetPos: Vector3[Int],
+  var targetDim: Int,
+  var color: Vector3[Float]
+) extends Entity(world) {
   var r: Double = HousePortalRenderer.initial_r
+  // Angle used to fluctuate r
   var phi: Double = 0.0
-  var fluxTimeout: Int = 5 * 20
 
-  def this(world: World) = this(world, new Vector3[Int](0, 50, 0), 0)
+  var pulsatePlz = false
+
+  def this(world: World, targetPos: Vector3[Int], targetDim: Int) = this(world, targetPos, targetDim, new Vector3[Float](1f, 1f, 1f))
+  def this(world: World) = this(world, new Vector3[Int](0, 50, 0), 0, new Vector3[Float](1f, 1f, 1f))
 
   override def entityInit(): Unit = {
     phi = 0
-    Sburb log "PORTAL HAS JOINED THE FIGHT"
+    if (Sburb.isClient) pulsatePlz = true
   }
 
   // TODO we probably need a not-shitty bounding box
   override def onCollideWithPlayer(player: EntityPlayer): Unit = {
-    // Sburb log "WARP!!!!!!!!!"
+    if (Sburb.isClient)
+      pulsatePlz = true
+
+    Sburb.warpPlayer(player, targetDim, targetPos)
   }
 
   override def onUpdate(): Unit = {
     super.onUpdate()
 
     if (Sburb.isClient) {
-      if (fluxTimeout > 0) {
-        fluxTimeout -= 1
-        return
-      }
+      if (phi == 0.0 && !pulsatePlz) return
+      pulsatePlz = false
 
       phi += (Pi / 2.0) / 20.0
 
-      if (phi == Pi) {
-        fluxTimeout = 10
+      if (phi == Pi)
         phi = 0
-      }
-      else if (phi > Pi) {
+      else if (phi > Pi)
         phi = Pi
-      }
 
-      r = HousePortalRenderer.initial_r - 0.2 * sin(phi)
+      r = HousePortalRenderer.initial_r - 0.3 * sin(phi)
     }
   }
 
@@ -218,11 +195,17 @@ extends Entity(world) {
     comp.setInteger("targetPosX", targetPos.x)
     comp.setInteger("targetPosY", targetPos.y)
     comp.setInteger("targetPosZ", targetPos.z)
+    comp.setFloat("colorR", color.r)
+    comp.setFloat("colorG", color.g)
+    comp.setFloat("colorB", color.b)
   }
   override def writeEntityToNBT(comp: NBTTagCompound): Unit = {
     targetDim = comp.getInteger("targetDim")
     targetPos.x = comp.getInteger("targetPosX")
     targetPos.y = comp.getInteger("targetPosY")
     targetPos.z = comp.getInteger("targetPosZ")
+    color.r = comp.getFloat("colorR")
+    color.g = comp.getFloat("colorG")
+    color.b = comp.getFloat("colorB")
   }
 }
