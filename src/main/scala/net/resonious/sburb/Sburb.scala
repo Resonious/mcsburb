@@ -9,12 +9,16 @@ import cpw.mods.fml.common.event.FMLInitializationEvent
 import cpw.mods.fml.common.event.FMLPostInitializationEvent
 import cpw.mods.fml.common.event.FMLServerStartingEvent
 import cpw.mods.fml.common.registry.GameRegistry
+import cpw.mods.fml.common.registry.EntityRegistry
+import cpw.mods.fml.client.registry.RenderingRegistry
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.common.ForgeChunkManager
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.game.SburbGame
 import net.resonious.sburb.game.grist.Grist
 import net.resonious.sburb.proxy.CommonProxy
+import net.resonious.sburb.entities.HousePortal
+import net.resonious.sburb.entities.HousePortalRenderer
 import cpw.mods.fml.common.FMLLog
 import cpw.mods.fml.common.event.FMLPreInitializationEvent
 import org.apache.logging.log4j.Logger
@@ -151,6 +155,11 @@ object Sburb {
         }
       }
     }
+
+    // Entities
+    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 16, 5, false)
+    if (isClient)
+      RenderingRegistry.registerEntityRenderingHandler(classOf[HousePortal], HousePortalRenderer)
 
     // Gui
     log("***Registering GUIs***")

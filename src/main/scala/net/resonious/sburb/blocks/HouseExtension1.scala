@@ -5,7 +5,7 @@ import net.minecraft.block.Block
 import net.minecraft.block.material.Material
 
 object HouseExtension1 extends ActiveBlock("House Extension 1", Material.rock) with GristShopItem {
-	setHardness(10)
+	setHardness(1.5f)
 	setStepSound(Block.soundTypeMetal)
 	hasStairs()
 	override def cost = 1
