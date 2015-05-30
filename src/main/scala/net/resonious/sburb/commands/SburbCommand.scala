@@ -213,6 +213,7 @@ object SburbCommand extends ActiveCommand {
 	}
 
   // For testing house portal epicycloid values
+  /*
   @Command
   def set(player: EntityPlayer, args: Array[String]): Unit = {
     if (args.length < 3) {
@@ -239,7 +240,9 @@ object SburbCommand extends ActiveCommand {
           setVar(a.toDouble)
     }
   }
+  */
   // Also for testing house portal renderer
+  /*
   @Command
   def tell(player: EntityPlayer): Unit = {
     player chat "k = "+HousePortalRenderer.k
@@ -247,6 +250,7 @@ object SburbCommand extends ActiveCommand {
     player chat "Radius = "+HousePortalRenderer.r*(1+HousePortalRenderer.k)+" (should remain constant)"
     player chat "thetaMax = "+HousePortalRenderer.thetaMax
   }
+  */
 
   @Command
   def agename(player: EntityPlayer, args: Array[String]): Unit = {
