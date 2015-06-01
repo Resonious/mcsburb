@@ -87,4 +87,5 @@ class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {
     
   }
   def tup() = (x,y,z)
+  def disp() = "<"+x+", "+y+", "+z+">"
 }

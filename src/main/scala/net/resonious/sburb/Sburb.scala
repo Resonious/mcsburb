@@ -18,7 +18,6 @@ import net.resonious.sburb.game.SburbGame
 import net.resonious.sburb.game.grist.Grist
 import net.resonious.sburb.proxy.CommonProxy
 import net.resonious.sburb.entities.HousePortal
-import net.resonious.sburb.entities.HousePortalRenderer
 import cpw.mods.fml.common.FMLLog
 import cpw.mods.fml.common.event.FMLPreInitializationEvent
 import org.apache.logging.log4j.Logger
@@ -157,9 +156,8 @@ object Sburb {
     }
 
     // Entities
-    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 60, 5, false)
-    if (isClient)
-      RenderingRegistry.registerEntityRenderingHandler(classOf[HousePortal], HousePortalRenderer)
+    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 256, 5, false)
+    proxy.registerRenderers()
 
     // Gui
     log("***Registering GUIs***")

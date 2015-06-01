@@ -471,7 +471,7 @@ class Structure(
     }
 
     class CenterChecker(
-      center:       Vector3[Int],
+      var center:   Vector3[Int],
       centerOffset: Vector3[Int],
       world:        World,
       heights:      HashMap[(Int, Int), (Int, Boolean)],
@@ -517,6 +517,7 @@ class Structure(
       // var zOffset = -1
 
       def setTo(newCenter: Vector3[Int]) = {
+        center = newCenter
         curPos = new Vector3[Int](newCenter)
         maxHeight = heightAt(curPos)
         minHeight = maxHeight
@@ -556,13 +557,16 @@ class Structure(
         block.isInstanceOf[BlockLeaves]
       }
 
-      def heightAt(s: Vector3[Int]): Int =
-        if (ignoreBlockAt(s))
-          if (ignoreBlockAt(s.instead(_.y -= 1)))
-            heightAt(s.instead( _.y -= 1 ))
-          else
-            s.y
+      final def heightAt(s: Vector3[Int]): Int =
+        if (s.y < 0)
+          -1
         else
+          if (ignoreBlockAt(s))
+            if (ignoreBlockAt(s.instead(_.y -= 1)))
+              heightAt(s.instead( _.y -= 1 ))
+            else
+              s.y
+          else
           heightAt(s.instead( _.y += 1 ))
 
       def scan(numBlocks: Int): Progress = {
@@ -596,11 +600,13 @@ class Structure(
           val height = heightInfo match { case (h, _) => h }
 
           // If we encounter an extreme, don't count it toward min/max height
-          if (height - maxHeight > 5) {
+          if (height < 0)
             extremes += 1
-          } else if (minHeight - height > 5) {
+          else if (height - maxHeight > 5)
             extremes += 1
-          }
+          else if (minHeight - height > 5)
+            extremes += 1
+
           else if (height < minHeight) minHeight = height
           else if (height > maxHeight) maxHeight = height
 
@@ -614,15 +620,6 @@ class Structure(
           }
 
           // ======================================= //
-          /*
-          zOffset += 1
-          if (zOffset > centerOffset.z) {
-            zOffset = -centerOffset.z
-            xOffset += 1
-          }
-
-          if (xOffset > centerOffset.x) return Found(center.instead(_.y = minHeight))
-          */
           offset += 2
           if (offset > centerOffset(dim)) {
             curEdge += 1

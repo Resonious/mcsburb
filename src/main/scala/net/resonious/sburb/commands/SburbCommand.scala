@@ -42,6 +42,7 @@ import com.xcompwiz.mystcraft.api.util.Color
 import com.xcompwiz.mystcraft.page.Page
 import net.minecraftforge.common.DimensionManager
 import net.minecraftforge.common.ForgeChunkManager
+import net.minecraft.nbt.NBTTagString
 import scala.math
 
 object SburbCommand extends ActiveCommand {
@@ -267,7 +268,10 @@ object SburbCommand extends ActiveCommand {
     }
     if (props.gameEntry.houseCurrentlyBeingMoved) {
       player chat "Your medium is still being generated. No worries."
+      return
     }
+
+    player chat "Generating medium..."
 
     val serverPlayer = props.gameEntry.serverPlayer
     if (serverPlayer != null) {
@@ -286,85 +290,100 @@ object SburbCommand extends ActiveCommand {
     )
     savedHouse.centerOffset.y = house.centerY
 
-    val dimensionId = InternalAPI.dimension.createAge
-    val age         = AgeData.getAge(dimensionId, false)
+    // I guess grabbing the structure AND generating the world in one tick is
+    // just too much.
+    After(20, 'ticks) execute {
+      val dimensionId = InternalAPI.dimension.createAge
+      val age         = AgeData.getAge(dimensionId, false)
 
-    age.setInstabilityEnabled(false)
-    val rand = new Random
+      age.setInstabilityEnabled(false)
+      val rand = new Random
 
-    var symbols = new ListBuffer[String]
-    symbols ++= List("DenseOres", "Caves", "BioConSingle")
+      var symbols = new ListBuffer[String]
+      symbols ++= List("DenseOres", "Caves", "BioConSingle")
 
-    val terrain = Array(
-      "TerrainNormal", "TerrainAplified", "TerrainEnd", "Skylands"
-    )
-    symbols += terrain(rand.nextInt(terrain.length))
+      val terrain = Array(
+        "TerrainNormal", "TerrainAplified", "TerrainEnd", "Skylands"
+      )
+      symbols += terrain(rand.nextInt(terrain.length))
 
-    val obstructions = Array(
-      "TerModSpheres", "FloatIslands", "Tendrils", "Obelisks",
-      "StarFissure", "HugeTrees", "GenSpikes", "CryForm"
-    )
-    symbols += obstructions(rand.nextInt(obstructions.length))
-    symbols += obstructions(rand.nextInt(obstructions.length))
+      val obstructions = Array(
+        "TerModSpheres", "FloatIslands", "Tendrils", "Obelisks",
+        "StarFissure", "HugeTrees", "GenSpikes", "CryForm"
+      )
+      symbols += obstructions(rand.nextInt(obstructions.length))
+      symbols += obstructions(rand.nextInt(obstructions.length))
 
-    val exploration = Array(
-      "Villages", "NetherFort", "Mineshafts", "Dungeons",
-      "Ravines", "LakesDeep"
-    )
-    symbols += exploration(rand.nextInt(exploration.length))
-    symbols += exploration(rand.nextInt(exploration.length))
+      val exploration = Array(
+        "Villages", "NetherFort", "Mineshafts", "Dungeons",
+        "Ravines", "LakesDeep"
+      )
+      symbols += exploration(rand.nextInt(exploration.length))
+      symbols += exploration(rand.nextInt(exploration.length))
 
-    val colors = Array(
-      "ModBlack", "ModRed", "ModGreen", "ModBlue",
-      "ModYellow", "ModWhite"
-    )
-    val color = colors(rand.nextInt(colors.length))
-    symbols ++= List(
-      color, "ColorFog",
-      color, "ColorFogNat",
-      color, "ColorSky",
-      color, "ColorSkyNat",
-      color, "ColorWater",
-      color, "ColorWaterNat",
-      color, "ColorGrass",
-      color, "ColorFoliage"
-    )
-    symbols ++= List(colors(rand.nextInt(colors.length)), "ColorCloud")
-    symbols ++= List(colors(rand.nextInt(colors.length)), "ColorSkyNight")
-    if (rand.nextInt(3) == 1) symbols += "Rainbow"
+      val colors = Array(
+        "ModBlack", "ModRed", "ModGreen", "ModBlue",
+        "ModYellow", "ModWhite"
+      )
+      val color = colors(rand.nextInt(colors.length))
+      symbols ++= List(
+        color, "ColorFog",
+        color, "ColorFogNat",
+        color, "ColorSky",
+        color, "ColorSkyNat",
+        color, "ColorWater",
+        color, "ColorWaterNat",
+        color, "ColorGrass",
+        color, "ColorFoliage"
+      )
+      symbols ++= List(colors(rand.nextInt(colors.length)), "ColorCloud")
+      symbols ++= List(colors(rand.nextInt(colors.length)), "ColorSkyNight")
+      if (rand.nextInt(3) == 1) symbols += "Rainbow"
 
-    // TODO the land of ?? and ??
-    age setAgeName player.getDisplayName() + " medium"
-    age setPages (symbols.map(Page.createSymbolPage))
-      .asJava
-      .asInstanceOf[java.util.List[ItemStack]]
+      // TODO the land of ?? and ??
+      age setAgeName player.getDisplayName() + " medium"
+      age.cruft.put("sburbcolor", new NBTTagString(color.replace("Mod", "")))
+      age setPages (symbols.map(Page.createSymbolPage))
+        .asJava
+        .asInstanceOf[java.util.List[ItemStack]]
 
-    playerEntry.mediumId = dimensionId
-    // Keeping this flag around so that maybe we can tell the player that it's being worked on
-    // if they're antsy and clicking buttons a lot.
-    playerEntry.houseCurrentlyBeingMoved = true
+      playerEntry.mediumId = dimensionId
+      // Keeping this flag around so that maybe we can tell the player that it's being worked on
+      // if they're antsy and clicking buttons a lot.
+      playerEntry.houseCurrentlyBeingMoved = true
 
-    // Force Mystcraft to generate the world,
-    val dummyPig = new EntityPig(player.worldObj)
-    Sburb.warpEntity(dummyPig, dimensionId, new Vector3(0, 50, 0))
+      // Force Mystcraft to generate the world,
+      val dummyPig = new EntityPig(player.worldObj)
+      Sburb.warpEntity(dummyPig, dimensionId, new Vector3(0, 50, 0))
 
-    val newWorld       = DimensionManager.getWorld(dimensionId)
-    val ticket         = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
-    val forceLoadChunk = new ChunkCoordIntPair(0, 0)
-    // Keep player name around in case they log out/die/yadda yadda
-    val playerName     = player.getCommandSenderName
-    // Then keep the world alive until we're ready to warp the player.
-    ForgeChunkManager.forceChunk(ticket, forceLoadChunk)
+      val newWorld       = DimensionManager.getWorld(dimensionId)
+      val ticket         = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
+      val forceLoadChunk = new ChunkCoordIntPair(0, 0)
+      // Keep player name around in case they log out/die/yadda yadda
+      val playerName     = player.getCommandSenderName
+      // Then keep the world alive until we're ready to warp the player.
+      ForgeChunkManager.forceChunk(ticket, forceLoadChunk)
 
-    // Give Mystcraft enough time to build the world before scanning the shit out of it.
-    After(5, 'seconds) execute {
-      Sburb log "PLACING HOUSE INTO MEDIUM"
-      house.placeIntoWorld(savedHouse, newWorld, {
-        case p => {
+      // Give Mystcraft enough time to build the world before scanning the shit out of it.
+      After(5, 'seconds) execute {
+        Sburb log "PLACING HOUSE INTO MEDIUM"
+
+        def houseWasPlaced(point: Vector3[Int]) = {
           // Informs SburbServerMode that whatever position/dimension you have saved is now wrong.
           house.wasMoved = true
           playerEntry.houseCurrentlyBeingMoved = false
           Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
+
+          // TODO For now, just the one portal...
+          // TODO also, for the PoI destination, try to scan for a good ground point.
+          val pointOfInterest = new Vector3[Int](rand.nextInt(1000), point.y + 6, rand.nextInt(1000))
+          val portal = new HousePortal(newWorld, pointOfInterest, dimensionId)
+          Sburb log "Instantiated portal"
+          portal.setPosition(point.x, point.y + 25, point.z)
+          portal.setColorFromString(color.replace("Mod", ""))
+          newWorld.spawnEntityInWorld(portal)
+          Sburb log "Spawned portal"
+
           ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
 
           Sburb playerOfName playerName match {
@@ -379,9 +398,17 @@ object SburbCommand extends ActiveCommand {
               Sburb.warpPlayer(player, dimensionId, housePos)
             }
           }
-
         }
-      })
+
+        house.placeIntoWorld(savedHouse, newWorld, houseWasPlaced)
+
+        house whenFailedToPlace { tryCount =>
+          val newSpot = new Vector3[Int](0, 100, 0)
+          Sburb log "Might be a blank world.. Placing house in the air somewhere."
+          house.placeAt(savedHouse, newWorld, newSpot)
+          houseWasPlaced(newSpot)
+        }
+      }
     }
   }
 

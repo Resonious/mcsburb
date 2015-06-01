@@ -15,13 +15,37 @@ import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.util.ResourceLocation
 import scala.math._
 import scala.util.Random
+import net.resonious.sburb.game.SburbProperties
 import net.minecraft.util.ResourceLocation
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderHelper
 import net.resonious.sburb.packets.ActivePacket
 import net.resonious.sburb.abstracts.PacketPipeline
+import com.xcompwiz.mystcraft.api.impl.InternalAPI
+import com.xcompwiz.mystcraft.world.agedata.AgeData
+import net.minecraftforge.common._
+import cpw.mods.fml.common.registry._
+import io.netty.buffer.ByteBuf
+
+object HousePortal {
+  // Radius of the entire epicycloid
+  final val radius: Double = 1.3
+  // kN (k numerator) is a constant prime number so that we don't get any insane dips in
+  // number of cusps.
+  final val kN: Double = 11.0
+  // k = 11/7 looks a lot like the Sburb portals, so that's where we start.
+  final val initial_kD: Double = 7.0
+  // Some algebra on the kD formula down there, so that we can start out at k = 11/7.
+  final val initial_r: Double = radius / (1.0 + kN/initial_kD) // ~0.5055555556
+  // Calculates the denominator of r relative to a given r. If you pass in initial_r, you
+  // should get 7.0!
+  def kD(r: Double) = (kN * r) / (radius - r)
+  // def k(r: Double) = kN / kD(r)
+}
 
 object HousePortalRenderer extends Render {
+  import HousePortal._
+
   lazy val t = Tessellator.instance
   lazy val mc = Minecraft.getMinecraft
   val tex = new ResourceLocation("sburb", "textures/tile_entities/houseportal.png")
@@ -55,19 +79,6 @@ object HousePortalRenderer extends Render {
 
   final val thetaMax = 20*Pi
 
-  // Radius of the entire epicycloid
-  final val radius: Double = 1.3
-  // kN (k numerator) is a constant prime number so that we don't get any insane dips in
-  // number of cusps.
-  final val kN: Double = 11.0
-  // k = 11/7 looks a lot like the Sburb portals, so that's where we start.
-  final val initial_kD: Double = 7.0
-  // Some algebra on the kD formula down there, so that we can start out at k = 11/7.
-  final val initial_r: Double = radius / (1.0 + kN/initial_kD) // ~0.5055555556
-  // Calculates the denominator of r relative to a given r. If you pass in initial_r, you
-  // should get 7.0!
-  def kD(r: Double) = (kN * r) / (radius - r)
-  // def k(r: Double) = kN / kD(r)
 
   override def doRender(entity: Entity, x: Double, y: Double, z: Double, yaw: Float, dt: Float) = {
     val portal = entity.asInstanceOf[HousePortal]
@@ -149,8 +160,22 @@ class HousePortal(
   var targetPos: Vector3[Int],
   var targetDim: Int,
   var color: Vector3[Float]
-) extends Entity(world) {
-  var r: Double = HousePortalRenderer.initial_r
+) extends Entity(world) with IEntityAdditionalSpawnData {
+  /*
+  class Properties extends IExtendedEntityProperties {
+    var portal: HousePortal = null
+
+    override def init(entity: Entity, world: World): Unit = {
+      portal = entity.asInstanceOf[HousePortal]
+    }
+    override def saveNBTData(NBTTagCompound comp): Unit = {
+    }
+    override def loadNBTData(NBTTagCompound comp): Unit = {
+    }
+  }
+  */
+
+  var r: Double = HousePortal.initial_r
   // Angle used to fluctuate r
   var phi: Double = 0.0
 
@@ -159,17 +184,49 @@ class HousePortal(
   def this(world: World, targetPos: Vector3[Int], targetDim: Int) = this(world, targetPos, targetDim, new Vector3[Float](1f, 1f, 1f))
   def this(world: World) = this(world, new Vector3[Int](0, 50, 0), 0, new Vector3[Float](1f, 1f, 1f))
 
+  def setColorFromString(colorStr: String) = {
+    color = colorStr match {
+      case "Black"  => new Vector3[Float](0f, 0f, 0f)
+      case "Red"    => new Vector3[Float](1f, 0f, 0f)
+      case "Green"  => new Vector3[Float](0f, 1f, 0f)
+      case "Blue"   => new Vector3[Float](0f, 0f, 1f)
+      case "Yellow" => new Vector3[Float](1f, 0.9f, 0f)
+      case "White"  => new Vector3[Float](0f, 0f, 0f)
+      case what     => {
+        Sburb log "Unexpected color "+what+" for portal!"
+        new Vector3[Float](rand.nextFloat, rand.nextFloat, rand.nextFloat)
+      }
+    }
+  }
+
+  def setColorFromWorld(): HousePortal = {
+    if (InternalAPI.dimension.isMystcraftAge(world.provider.dimensionId)) {
+      val age = AgeData.getAge(world.provider.dimensionId, Sburb.isClient)
+
+      val colorStr = age.cruft.get("sburbcolor")
+      setColorFromString(colorStr.toString.replace("\"", ""))
+      Sburb log "SET COLOR TO "+color.disp
+    }
+    else Sburb log "NOT SETTING COLOR. AM NOT IN A MEDIUM"
+    this
+  }
+
   override def entityInit(): Unit = {
     phi = 0
     if (Sburb.isClient) pulsatePlz = true
+    Sburb log "PORTAL INITIALZED: COLOR = "+color.disp+" TARGETDIM = "+targetDim
   }
 
   // TODO we probably need a not-shitty bounding box
   override def onCollideWithPlayer(player: EntityPlayer): Unit = {
     if (Sburb.isClient)
       pulsatePlz = true
-
-    Sburb.warpPlayer(player, targetDim, targetPos)
+    else {
+      Sburb log "U WANT 2 WARP 2 "+targetPos.disp+" @ "+targetDim
+      val props = SburbProperties of player
+      if (!props.serverMode.activated)
+        Sburb.warpPlayer(player, targetDim, targetPos)
+    }
   }
 
   override def onUpdate(): Unit = {
@@ -186,8 +243,27 @@ class HousePortal(
       else if (phi > Pi)
         phi = Pi
 
-      r = HousePortalRenderer.initial_r - 0.3 * sin(phi)
+      r = HousePortal.initial_r - 0.3 * sin(phi)
     }
+  }
+
+  override def writeSpawnData(buf: ByteBuf): Unit = {
+    buf.writeInt(targetPos.x)
+    buf.writeInt(targetPos.y)
+    buf.writeInt(targetPos.z)
+    buf.writeInt(targetDim)
+    buf.writeFloat(color.r)
+    buf.writeFloat(color.g)
+    buf.writeFloat(color.b)
+  }
+  override def readSpawnData(buf: ByteBuf): Unit = {
+    targetPos.x = buf.readInt
+    targetPos.y = buf.readInt
+    targetPos.z = buf.readInt
+    targetDim   = buf.readInt
+    color.r     = buf.readFloat
+    color.g     = buf.readFloat
+    color.b     = buf.readFloat
   }
 
   override def readEntityFromNBT(comp: NBTTagCompound): Unit = {
