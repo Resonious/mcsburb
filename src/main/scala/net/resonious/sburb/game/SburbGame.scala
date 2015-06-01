@@ -113,103 +113,19 @@ object SburbGame {
     houseNames(rand.nextInt(houseNames.length))
   }
   
-  // Reads from houses.dat to populate house data.
-  // This should be called AFTER SburbGames are loaded.
-  // TODO actually can this. We do not want anymore!!!
+  // This is OLD SHIT.
   def readHouseData(games: Iterable[SburbGame]): Unit = {
     throw new SburbException("NO MORE HOUSES.DAT!")
-
-    def asInts(str: String) = {
-      str.split(',') map { i=> (Integer valueOf i).asInstanceOf[Int] }
-    }
-    
-    Sburb log "Doing the sburb houses thing!"
-    
-    // All house names that are currently being used by players
-    // (We also add the house name to allHouseNames)
-    val takenHouses = new HashSet[String]
-    games foreach { g =>
-      g.takenHouseNames foreach { name => 
-        takenHouses add name
-        if (!(allHouseNames contains name))
-        	allHouseNames += name
-      }
-    }
-    
-    Sburb log "There are "+takenHouses.size+" taken houses."
-    
-    // Read the file
-    val sburbFile = new File("./houses.dat")
-    if (!sburbFile.exists) {
-      Sburb logError "There is no houses.dat file in the server folder. "+
-      								"Without sburb.dat, the server doesn't know where "+
-      								"the houses are!"
-      return
-    }
-    
-    val fileIn = new FileInputStream(sburbFile)
-    val scan = new Scanner(fileIn)
-    if (!scan.hasNextLine())
-      Sburb log "What?? No houses??"
-    
-    while (scan.hasNextLine) {
-      try {
-        val line = scan.nextLine
-        // House name and coordinate data are separated by a colon.
-        val houseNameAndData = line split ':'
-        
-        val houseName = houseNameAndData(0)
-        var msg = "Checking house "+houseName+"... "
-        if (houseName == "DEFAULT") {
-          msg += "It is the default!"
-          // Default house should only have 1 vector3 in its coordinate data.
-          defaultSpawn = new Vector3(asInts(houseNameAndData(1)))
-        }
-        // If the house isn't already taken, add it to available houses.
-        else if (!takenHouses(houseName)) {
-          // The spawn and 2 corners are separated by pipes.
-          val data = houseNameAndData(1) split '|'
-          
-          // First is spawn (3 ints separated by commas).
-          val position = new Vector3[Int](asInts(data(0)))
-          // Last 2 are the X/X coords of the corners that make the boundary
-          // of the server player (2 ints separated by commas).
-          val corner1 = asInts(data(1))
-          val corner2 = asInts(data(2))
-          
-          // TODO since this function is gone, we gotta change that constructor
-          // availableHouses += new PlayerHouse(houseName, position, corner1, corner2)
-          
-          if (!(SburbGame.allHouseNames contains houseName))
-            SburbGame.allHouseNames += houseName
-          
-          msg += "Added it to registry!"
-        }
-        else
-        	msg += "Looks like it's already taken by a player."
-        
-        Sburb log msg
-      }
-      catch {
-        case e: Exception => {
-          Sburb logError "Something's wrong with sburb.dat!"
-          e.printStackTrace()
-        }
-      }
-    }
-    
-    Sburb log "All done! Houses: "
-    Sburb log (allHouseNames mkString ", ")
   }
   
   // The place to throw people who aren't playing SBURB.
+  // I don't think this is even used.
   var defaultSpawn = new Vector3[Int]
+
   // Every house name.
+  // This either...
   val allHouseNames = new ArrayBuffer[String]
-  // List of houses ripe for the taking.
-  // TODO NO MORE! ALL HOUSES IN /houses ARE FAIR GAME ALWAYS
-  // val availableHouses = new ArrayBuffer[PlayerHouse]
-  
+
   // This structure contains all sburb-related state that used to be a part of SburbProperties
   class PlayerEntry(n:String = "", h:PlayerHouse = null) extends Serializable {
     @transient private var _game: SburbGame = null
@@ -282,13 +198,50 @@ object SburbGame {
       r - r/2
     }
 
-    def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit, takingTooLong: (Int) => Unit): Unit =
+    final def placeAt(struct: Structure, world: World, point: Vector3[Int]) = {
+      minX = point.x - struct.centerOffset.x
+      maxX = point.x + struct.centerOffset.x
+      minZ = point.z - struct.centerOffset.z
+      maxZ = point.z + struct.centerOffset.z
+      centerY = struct.centerOffset.y
+      minY = point.y - struct.centerOffset.y
+
+      // TODO have the spawn be specified in the structure or something
+      // _spawn = point instead { p => p.y += 3; p.z -= 1 }
+      _spawn.x = minX + 1
+      _spawn.y = point.y + 1
+      _spawn.z = minZ + 1
+
+      // Some houses are small and not comfortable for the server player to move
+      // around within the boundary.
+      val minSize = 20
+      val halfMinSize = minSize / 2
+
+      val xDif = maxX - minX
+      val halfXDif = xDif / 2
+      if (xDif < minSize) {
+        maxX += halfMinSize - halfXDif
+        minX -= halfMinSize - halfXDif
+      }
+      val zDif = maxZ - minZ
+      val halfZDif = zDif / 2
+      if (zDif < minSize) {
+        maxZ += halfMinSize - halfZDif
+        minZ -= halfMinSize - halfZDif
+      }
+
+      Sburb log "Placing structure..."
+      struct.placeAt(world, point, false)
+      Sburb log "Done."
+    }
+
+    final def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit, takingTooLong: (Int) => Unit): Unit =
       placeIntoWorld(struct, world, 1, callback, takingTooLong)
 
-    def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit): Unit =
+    final def placeIntoWorld(struct: Structure, world: World, callback: (Vector3[Int]) => Unit): Unit =
       placeIntoWorld(struct, world, 1, callback, null)
 
-    def placeIntoWorld(
+    final def placeIntoWorld(
       struct: Structure,
       world: World,
       tryCount: Int,
@@ -298,7 +251,7 @@ object SburbGame {
       // Right here... Place the house.
       val testPoint = new Vector3[Int](genTestCoord, 150, genTestCoord)
 
-      val radius = 50
+      val radius = 500
       Sburb log "Checking ["+testPoint.x+", "+testPoint.y+", "+testPoint.z+"] with a "+radius+" block radius for house spawn point."
 
       val acceptWater = InternalAPI.dimension.isMystcraftAge(world.provider.dimensionId)
@@ -306,38 +259,7 @@ object SburbGame {
         case Some(point) => {
           Sburb log "Found a spot! ["+point.x+", "+point.y+", "+point.z+"]"
 
-          minX = point.x - struct.centerOffset.x
-          maxX = point.x + struct.centerOffset.x
-          minZ = point.z - struct.centerOffset.z
-          maxZ = point.z + struct.centerOffset.z
-          centerY = struct.centerOffset.y
-          minY = point.y - struct.centerOffset.y
-
-          _spawn.y = point.y + 5
-          _spawn.x = minX
-          _spawn.z = minZ
-
-          // Some houses are small and not comfortable for the server player to move
-          // around within the boundary.
-          val minSize = 20
-          val halfMinSize = minSize / 2
-
-          val xDif = maxX - minX
-          val halfXDif = xDif / 2
-          if (xDif < minSize) {
-            maxX += halfMinSize - halfXDif
-            minX -= halfMinSize - halfXDif
-          }
-          val zDif = maxZ - minZ
-          val halfZDif = zDif / 2
-          if (zDif < minSize) {
-            maxZ += halfMinSize - halfZDif
-            minZ -= halfMinSize - halfZDif
-          }
-
-          Sburb log "Placing structure..."
-          struct.placeAt(world, point, false)
-          Sburb log "Done."
+          placeAt(struct, world, point)
           
           if (callback != null) callback(point)
         }
@@ -345,9 +267,14 @@ object SburbGame {
         case None => {
           Sburb log "Try #"+tryCount+" - couldn't find any good spot."
 
-          takingTooLong(tryCount)
-          if (tryCount >= 50) {
-            throw new SburbException("Tried 50 TIMES TO PLACE A DAMN HOUSE. BRUH.")
+          if (takingTooLong != null) takingTooLong(tryCount)
+          if (tryCount >= 3) {
+            if (_whenFailedToPlace == null)
+              throw new SburbException("Tried 3 TIMES TO PLACE A DAMN HOUSE. BRUH.")
+            else {
+              _whenFailedToPlace(tryCount)
+              return
+            }
           }
 
           placeIntoWorld(struct, world, tryCount + 1, callback, takingTooLong)
@@ -378,6 +305,11 @@ object SburbGame {
     // the house is in fact still being generated...
     @transient var _whenTakingAwhile: (Int) => Unit = null
     def whenTakingAwhile(callback: (Int) => Unit) = _whenTakingAwhile = callback
+
+    // Just as hacky as the previous callback, this gets called when the thing
+    // fails to place entirely.
+    @transient var _whenFailedToPlace: (Int) => Unit = null
+    def whenFailedToPlace(callback: (Int) => Unit) = _whenFailedToPlace = callback
 
     // So this now means the file name.
     var name = _name

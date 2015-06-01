@@ -11,6 +11,9 @@ import scala.collection.mutable.HashMap
 import net.resonious.sburb.game.SburbGame
 import net.resonious.sburb.Sburb
 import net.resonious.sburb.abstracts.GuiId
+import net.resonious.sburb.entities.HousePortalRenderer
+import cpw.mods.fml.client.registry.RenderingRegistry
+import net.resonious.sburb.entities.HousePortal
 
 class CommonProxy extends IGuiHandler {
   def onGameStart = {}
@@ -21,10 +24,16 @@ class CommonProxy extends IGuiHandler {
 	override def getClientGuiElement(guiId:Int, player:EntityPlayer, world:World, x:Int, y:Int, z:Int):Object = {
   	GuiId.get(guiId).createGuiScreen(player,x,y,z)
 	}
+
+  def registerRenderers(): Unit = {}
 }
 
 class ClientProxy extends CommonProxy {
   
+  override def registerRenderers() {
+    RenderingRegistry.registerEntityRenderingHandler(classOf[HousePortal], HousePortalRenderer)
+  }
+
   override def onGameStart = {
     // Actually this is probably garbage anyway
     // For now, keep default inventory
