@@ -1,6 +1,7 @@
 package net.resonious.sburb.commands
 
 import net.minecraft.entity.passive.EntityPig
+import net.resonious.sburb.game.Medium
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import scala.collection.JavaConverters.seqAsJavaListConverter
@@ -26,7 +27,9 @@ import net.minecraft.client.entity.EntityClientPlayerMP
 import net.resonious.sburb.Structure
 import scala.util.control.Breaks
 import net.resonious.sburb.entities.HousePortal
+import net.resonious.sburb.entities.ReturnNode
 import net.resonious.sburb.entities.HousePortalRenderer
+import net.resonious.sburb.entities.ReturnNode
 import net.minecraft.block.BlockWood
 import net.minecraft.block.BlockLeaves
 import net.minecraft.block.BlockLiquid
@@ -213,8 +216,8 @@ object SburbCommand extends ActiveCommand {
 	  player chat "Cleared Sburb game data for "+plr.getDisplayName+"!"
 	}
 
-  // For testing house portal epicycloid values
   /*
+  // NOW FOR RETURN NODE
   @Command
   def set(player: EntityPlayer, args: Array[String]): Unit = {
     if (args.length < 3) {
@@ -226,7 +229,11 @@ object SburbCommand extends ActiveCommand {
 
     def setVar(value: Double) = {
       varToChange match {
-        case "r" => HousePortalRenderer.r = value
+        case "er" => ReturnNode.er = value
+        case "eR" => ReturnNode.eR = value
+        case "ed" => ReturnNode.ed = value
+        case "es" => ReturnNode.es = value
+        case "doCyc" => ReturnNode.doCyc = value != 0.0
         case _ => player chat "No"
       }
     }
@@ -241,15 +248,17 @@ object SburbCommand extends ActiveCommand {
           setVar(a.toDouble)
     }
   }
-  */
   // Also for testing house portal renderer
-  /*
   @Command
   def tell(player: EntityPlayer): Unit = {
-    player chat "k = "+HousePortalRenderer.k
-    player chat "r = "+HousePortalRenderer.r
-    player chat "Radius = "+HousePortalRenderer.r*(1+HousePortalRenderer.k)+" (should remain constant)"
-    player chat "thetaMax = "+HousePortalRenderer.thetaMax
+    player chat "er = "+ReturnNode.er
+    player chat "eR = "+ReturnNode.eR
+    player chat "ed = "+ReturnNode.ed
+    player chat "es = "+ReturnNode.es
+    if (ReturnNode.doCyc)
+      player chat "epicycloid: on"
+    else
+      player chat "epicycloid: off"
   }
   */
 
@@ -261,155 +270,7 @@ object SburbCommand extends ActiveCommand {
 
   @Command
   def medium(player: EntityPlayer, args: Array[String]): Unit = {
-    val props = SburbProperties of player
-    if (!props.hasGame) {
-      player chat "No sburb game!"
-      return
-    }
-    if (props.gameEntry.houseCurrentlyBeingMoved) {
-      player chat "Your medium is still being generated. No worries."
-      return
-    }
-
-    player chat "Generating medium..."
-
-    val serverPlayer = props.gameEntry.serverPlayer
-    if (serverPlayer != null) {
-      val serverProps = SburbProperties of serverPlayer
-      serverProps.serverMode.activated = false
-    }
-
-    val playerEntry = props.gameEntry
-    val house       = playerEntry.house
-
-    val savedHouse = new Structure(
-      player.worldObj,
-      (house.minX, house.minY, house.minZ),
-      (house.maxX, 500,        house.maxZ),
-      Map("minecraft:dirt" -> 'ignore)
-    )
-    savedHouse.centerOffset.y = house.centerY
-
-    // I guess grabbing the structure AND generating the world in one tick is
-    // just too much.
-    After(20, 'ticks) execute {
-      val dimensionId = InternalAPI.dimension.createAge
-      val age         = AgeData.getAge(dimensionId, false)
-
-      age.setInstabilityEnabled(false)
-      val rand = new Random
-
-      var symbols = new ListBuffer[String]
-      symbols ++= List("DenseOres", "Caves", "BioConSingle")
-
-      val terrain = Array(
-        "TerrainNormal", "TerrainAplified", "TerrainEnd", "Skylands"
-      )
-      symbols += terrain(rand.nextInt(terrain.length))
-
-      val obstructions = Array(
-        "TerModSpheres", "FloatIslands", "Tendrils", "Obelisks",
-        "StarFissure", "HugeTrees", "GenSpikes", "CryForm"
-      )
-      symbols += obstructions(rand.nextInt(obstructions.length))
-      symbols += obstructions(rand.nextInt(obstructions.length))
-
-      val exploration = Array(
-        "Villages", "NetherFort", "Mineshafts", "Dungeons",
-        "Ravines", "LakesDeep"
-      )
-      symbols += exploration(rand.nextInt(exploration.length))
-      symbols += exploration(rand.nextInt(exploration.length))
-
-      val colors = Array(
-        "ModBlack", "ModRed", "ModGreen", "ModBlue",
-        "ModYellow", "ModWhite"
-      )
-      val color = colors(rand.nextInt(colors.length))
-      symbols ++= List(
-        color, "ColorFog",
-        color, "ColorFogNat",
-        color, "ColorSky",
-        color, "ColorSkyNat",
-        color, "ColorWater",
-        color, "ColorWaterNat",
-        color, "ColorGrass",
-        color, "ColorFoliage"
-      )
-      symbols ++= List(colors(rand.nextInt(colors.length)), "ColorCloud")
-      symbols ++= List(colors(rand.nextInt(colors.length)), "ColorSkyNight")
-      if (rand.nextInt(3) == 1) symbols += "Rainbow"
-
-      // TODO the land of ?? and ??
-      age setAgeName player.getDisplayName() + " medium"
-      age.cruft.put("sburbcolor", new NBTTagString(color.replace("Mod", "")))
-      age setPages (symbols.map(Page.createSymbolPage))
-        .asJava
-        .asInstanceOf[java.util.List[ItemStack]]
-
-      playerEntry.mediumId = dimensionId
-      // Keeping this flag around so that maybe we can tell the player that it's being worked on
-      // if they're antsy and clicking buttons a lot.
-      playerEntry.houseCurrentlyBeingMoved = true
-
-      // Force Mystcraft to generate the world,
-      val dummyPig = new EntityPig(player.worldObj)
-      Sburb.warpEntity(dummyPig, dimensionId, new Vector3(0, 50, 0))
-
-      val newWorld       = DimensionManager.getWorld(dimensionId)
-      val ticket         = ForgeChunkManager.requestTicket(Sburb, newWorld, ForgeChunkManager.Type.NORMAL)
-      val forceLoadChunk = new ChunkCoordIntPair(0, 0)
-      // Keep player name around in case they log out/die/yadda yadda
-      val playerName     = player.getCommandSenderName
-      // Then keep the world alive until we're ready to warp the player.
-      ForgeChunkManager.forceChunk(ticket, forceLoadChunk)
-
-      // Give Mystcraft enough time to build the world before scanning the shit out of it.
-      After(5, 'seconds) execute {
-        Sburb log "PLACING HOUSE INTO MEDIUM"
-
-        def houseWasPlaced(point: Vector3[Int]) = {
-          // Informs SburbServerMode that whatever position/dimension you have saved is now wrong.
-          house.wasMoved = true
-          playerEntry.houseCurrentlyBeingMoved = false
-          Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
-
-          // TODO For now, just the one portal...
-          // TODO also, for the PoI destination, try to scan for a good ground point.
-          val pointOfInterest = new Vector3[Int](rand.nextInt(1000), point.y + 6, rand.nextInt(1000))
-          val portal = new HousePortal(newWorld, pointOfInterest, dimensionId)
-          Sburb log "Instantiated portal"
-          portal.setPosition(point.x, point.y + 25, point.z)
-          portal.setColorFromString(color.replace("Mod", ""))
-          newWorld.spawnEntityInWorld(portal)
-          Sburb log "Spawned portal"
-
-          ForgeChunkManager.unforceChunk(ticket, forceLoadChunk)
-
-          Sburb playerOfName playerName match {
-            case null => {
-              playerEntry.spawnPointDirty = true
-            }
-
-            case player => {
-              val housePos = house.spawn
-              val coords = new ChunkCoordinates(housePos.x, housePos.y, housePos.z)
-              player.setSpawnChunk(coords, true, dimensionId)
-              Sburb.warpPlayer(player, dimensionId, housePos)
-            }
-          }
-        }
-
-        house.placeIntoWorld(savedHouse, newWorld, houseWasPlaced)
-
-        house whenFailedToPlace { tryCount =>
-          val newSpot = new Vector3[Int](0, 100, 0)
-          Sburb log "Might be a blank world.. Placing house in the air somewhere."
-          house.placeAt(savedHouse, newWorld, newSpot)
-          houseWasPlaced(newSpot)
-        }
-      }
-    }
+    Medium.generate(player)
   }
 
   @Command
@@ -473,10 +334,23 @@ object SburbCommand extends ActiveCommand {
   @Command
   def spawnportal(player: EntityPlayer) = {
     val portal = new HousePortal(player.worldObj)
-    portal.setPosition(player.posX, player.posY, player.posZ + 2)
+    portal.targetPos = new Vector3[Int](100, 100, 100)
+    portal.setColorFromWorld()
+    portal.setPosition(player.posX, player.posY, player.posZ + 4)
     player.worldObj.spawnEntityInWorld(portal)
 
     Sburb log "DONE. Spawned a portal"
+  }
+
+  @Command
+  def rnode(player: EntityPlayer) = {
+    val portal = new ReturnNode(player.worldObj)
+    portal.targetPos = new Vector3[Int](100, 100, 100)
+    portal.setColorFromWorld()
+    portal.setPosition(player.posX, player.posY, player.posZ + 4)
+    player.worldObj.spawnEntityInWorld(portal)
+
+    Sburb log "DONE. Spawned a return node"
   }
 
 	class TestPacket extends ActivePacket {

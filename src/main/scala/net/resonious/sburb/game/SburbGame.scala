@@ -138,6 +138,7 @@ object SburbGame {
     def name = n
     var server, client = ""
     var mediumId = 0
+    var mediumColor: String = null
     // Assigned by teleporting to medium, accessed in SburbProperties#onJoin.
     // This is in case the player crashes while house is generating.
     var spawnPointDirty = false
@@ -367,6 +368,10 @@ class SburbGame(gid: String = "") extends Serializable {
     }
     this
   }
+
+  def mediumColors() = players.values
+                        .map(_.mediumColor)
+                        .filter(_ != null)
   
   // Makes sure the player's grist has all the correct grist types.
   def checkPlayerGrist(plr: PlayerEntry) = {

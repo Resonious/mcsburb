@@ -249,6 +249,31 @@ object StructCommand extends ActiveCommand {
     player chat "Set center offset y value to " + state.lastStruct.centerOffset.y
   }
 
+  def setspawn(player: EntityPlayer): Unit = {
+    val name = player.getCommandSenderName
+    if (!(states contains name)) {
+      player chat "Plz grab first"
+      return
+    }
+
+    val state = states(name)
+    if (state.lastStruct == null) {
+      player chat "You currently have no structure."
+      return
+    }
+
+    state.corner1 match {
+      case (x1, y1, z1) => state.corner2 match {
+        case (x2, y2, z2) => {
+          // TODO test that this actually works (SburbGame.PlayerHouse currently does not use it)
+          state.lastStruct.spawnPoint.x = player.posX.intValue - math.min(x1, x2)
+          state.lastStruct.spawnPoint.y = player.posY.intValue - math.min(y1, y2)
+          state.lastStruct.spawnPoint.z = player.posZ.intValue - math.min(z1, z2)
+        }
+      }
+    }
+  }
+
   override def processCommand(sender: ICommandSender, args: Array[String]): Unit = {
     sender match {
       case player: EntityPlayer => {

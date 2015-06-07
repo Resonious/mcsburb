@@ -11,9 +11,11 @@ import scala.collection.mutable.HashMap
 import net.resonious.sburb.game.SburbGame
 import net.resonious.sburb.Sburb
 import net.resonious.sburb.abstracts.GuiId
-import net.resonious.sburb.entities.HousePortalRenderer
 import cpw.mods.fml.client.registry.RenderingRegistry
+import net.resonious.sburb.entities.HousePortalRenderer
 import net.resonious.sburb.entities.HousePortal
+import net.resonious.sburb.entities.ReturnNodeRenderer
+import net.resonious.sburb.entities.ReturnNode
 
 class CommonProxy extends IGuiHandler {
   def onGameStart = {}
@@ -32,6 +34,7 @@ class ClientProxy extends CommonProxy {
   
   override def registerRenderers() {
     RenderingRegistry.registerEntityRenderingHandler(classOf[HousePortal], HousePortalRenderer)
+    RenderingRegistry.registerEntityRenderingHandler(classOf[ReturnNode], ReturnNodeRenderer)
   }
 
   override def onGameStart = {
