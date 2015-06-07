@@ -18,6 +18,7 @@ import net.resonious.sburb.game.SburbGame
 import net.resonious.sburb.game.grist.Grist
 import net.resonious.sburb.proxy.CommonProxy
 import net.resonious.sburb.entities.HousePortal
+import net.resonious.sburb.entities.ReturnNode
 import cpw.mods.fml.common.FMLLog
 import cpw.mods.fml.common.event.FMLPreInitializationEvent
 import org.apache.logging.log4j.Logger
@@ -156,7 +157,9 @@ object Sburb {
     }
 
     // Entities
-    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 256, 5, false)
+    // --------------------------------------------------------------------v---- That's our internal id
+    EntityRegistry.registerModEntity(classOf[HousePortal], "sburb.portal", 1, this, 512, 5, false)
+    EntityRegistry.registerModEntity(classOf[ReturnNode], "sburb.return_node", 2, this, 512, 5, false)
     proxy.registerRenderers()
 
     // Gui

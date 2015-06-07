@@ -21,8 +21,8 @@ class Vector3[T](var x:T=0, var y:T=0, var z:T=0) extends Serializable {
   def this(v: Vector3[T]) = this(v.x, v.y, v.z)
 
   def r = x
-  def b = y
-  def g = z
+  def g = y
+  def b = z
 
   def r_=(other: T) = x = other
   def g_=(other: T) = y = other

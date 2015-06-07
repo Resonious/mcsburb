@@ -267,6 +267,9 @@ object Structure {
     struct.centerOffset.x = comp.getInteger("centerOffsetX")
     struct.centerOffset.y = comp.getInteger("centerOffsetY")
     struct.centerOffset.z = comp.getInteger("centerOffsetZ")
+    struct.spawnPoint.x   = comp.getInteger("spawnPointX")
+    struct.spawnPoint.y   = comp.getInteger("spawnPointY")
+    struct.spawnPoint.z   = comp.getInteger("spawnPointZ")
     struct.corner1 = (
       comp.getInteger("corner1X"),
       comp.getInteger("corner1Y"),
@@ -302,6 +305,8 @@ class Structure(
   var corner1: (Int,Int,Int),
   var corner2: (Int,Int,Int),
   blacklist: Map[String, Symbol],
+  // Should be false if this structure is to be loaded in another world.
+  // (/struct command sets this to false)
   assumeSameOCState: Boolean = true
 ) {
   // Round 1 is for the majority of blocks
@@ -309,9 +314,12 @@ class Structure(
   // Round 2 contains stuff that might fall, like torches
   var round2 = new NBTTagList
 
-  // Keep track of this so that spawn coordinates can corrospond to the center
+  // Keep track of this so that placement coordinates can corrospond to the center
   // of the structure.
   var centerOffset = new Vector3[Int]
+
+  // Optional spawn point position relative to center.
+  var spawnPoint = new Vector3[Int]
 
   // Here lies the "real" constructor logic for this class. I'd refactor it, but
   // why fix what's not broken at this point.
@@ -414,6 +422,9 @@ class Structure(
     comp.setInteger("centerOffsetX", centerOffset.x)
     comp.setInteger("centerOffsetY", centerOffset.y)
     comp.setInteger("centerOffsetZ", centerOffset.z)
+    comp.setInteger("spawnPointX", spawnPoint.x)
+    comp.setInteger("spawnPointY", spawnPoint.y)
+    comp.setInteger("spawnPointZ", spawnPoint.z)
     corner1 match {
       case (x, y, z) => {
         comp.setInteger("corner1X", x)

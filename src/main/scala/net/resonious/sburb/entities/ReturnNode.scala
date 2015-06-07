@@ -28,60 +28,40 @@ import net.minecraftforge.common._
 import cpw.mods.fml.common.registry._
 import io.netty.buffer.ByteBuf
 
-object HousePortal {
+object ReturnNode {
   // Radius of the entire epicycloid
   final val radius: Double = 1.3
   // kN (k numerator) is a constant prime number so that we don't get any insane dips in
-  // number of cusps.
+  // number of cusps. (completely stupid it happens anyway because of fractions dummy)
   final val kN: Double = 11.0
   // k = 11/7 looks a lot like the Sburb portals, so that's where we start.
   final val initial_kD: Double = 7.0
   // Some algebra on the kD formula down there, so that we can start out at k = 11/7.
-  final val initial_r: Double = radius / (1.0 + kN/initial_kD) // ~0.5055555556
+  final val initial_r: Double = radius / (1.0 + kN/initial_kD)
   // Calculates the denominator of r relative to a given r. If you pass in initial_r, you
   // should get 7.0!
   def kD(r: Double) = (kN * r) / (radius - r)
   // def k(r: Double) = kN / kD(r)
+
+  var er: Double = 0.9
+  var eR: Double = 1.7
+  var ed: Double = 9
+  var es: Double = 0.85
 }
 
-object HousePortalRenderer extends Render {
-  import HousePortal._
+object ReturnNodeRenderer extends Render {
+  import net.resonious.sburb.entities.HousePortalRenderer.VecTup
+  import ReturnNode._
 
   lazy val t = Tessellator.instance
   lazy val mc = Minecraft.getMinecraft
   val tex = new ResourceLocation("sburb", "textures/tile_entities/houseportal.png")
 
-  implicit class VecTup(tup: (Double, Double)) {
-    def x = tup match { case (n, _) => n }
-    def y = tup match { case (_, n) => n }
-
-    def dot(other: (Double, Double)): Double = tup match {
-      case (x1, y1) => other match {
-        case (x2, y2) => x1 * x2 + y1 * y2
-      }
-    }
-
-    def -(other: (Double, Double)): (Double, Double) = tup match {
-      case (x1, y1) => other match {
-        case (x2, y2) => (x1 - x2, y1 - y2)
-      }
-    }
-
-    def +(other: (Double, Double)): (Double, Double) = tup match {
-      case (x1, y1) => other match {
-        case (x2, y2) => (x1 + x2, y1 + y2)
-      }
-    }
-
-    def magnitude = tup match { case (x, y) => math.sqrt(pow(x, 2) + pow(y, 2)) }
-
-    def disp = tup match { case (x, y) => "<"+x+", "+y+">" }
-  }
-
   final val thetaMax = 20*Pi
+  var printedShit = false
 
   override def doRender(entity: Entity, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) = {
-    val portal = entity.asInstanceOf[HousePortal]
+    val portal = entity.asInstanceOf[ReturnNode]
     val r = portal.r
     val color = portal.color
 
@@ -103,15 +83,24 @@ object HousePortalRenderer extends Render {
         r*(k + 1)*sin(theta) - r*sin((k + 1)*theta)
       )
     }
+    def otherthing(theta: Double) = {
+      (
+        es*(eR*cos(theta) + er*sin(ed*theta)),
+        es*(eR*sin(theta) + er*cos(ed*theta))
+      )
+    }
+
+    var pointFunc = otherthing(_)
+    var drawCycloid = false
 
     var theta = 0.0
     var point1: (Double, Double) = null
     var point2: (Double, Double) = null
     while (theta <= thetaMax) {
       if (point1 == null) {
-        point1 = epicycloid(theta)
+        point1 = pointFunc(theta)
       } else {
-        point2 = epicycloid(theta)
+        point2 = pointFunc(theta)
 
         // Angle Between Points
         val abp = (point2 - point1) match {
@@ -139,8 +128,14 @@ object HousePortalRenderer extends Render {
         point1 = point2
       }
       theta += Pi/60
+
+      if (!drawCycloid && theta > thetaMax / 2) {
+        drawCycloid = true
+        theta = 0
+        pointFunc = epicycloid(_)
+        point1 = null
+      }
     }
-    // printedShit = true
 
     t.draw()
 
@@ -154,43 +149,15 @@ object HousePortalRenderer extends Render {
   }
 }
 
-// TODO make ActiveEntity or something...?
-class HousePortal(world: World) extends Portal(world) {
-  var r: Double = initial_r
-  // Angle used to fluctuate r
-  var phi: Double = 0.0
-
-  var pulsatePlz = false
-
-  def initial_r = HousePortal.initial_r
+class ReturnNode(world: World) extends Portal(world) {
+  def r = ReturnNode.initial_r
 
   override def entityInit(): Unit = {
-    phi = 0
-    if (Sburb.isClient) pulsatePlz = true
   }
 
-  override def onCollideWithPlayer(player: EntityPlayer): Unit = {
-    if (Sburb.isClient)
-      pulsatePlz = true
-    else
-      super.onCollideWithPlayer(player)
-  }
-
-  override def onUpdate(): Unit = {
-    super.onUpdate()
-
-    if (Sburb.isClient) {
-      if (phi == 0.0 && !pulsatePlz) return
-      pulsatePlz = false
-
-      phi += (Pi / 2.0) / 20.0
-
-      if (phi == Pi)
-        phi = 0
-      else if (phi > Pi)
-        phi = Pi
-
-      r = HousePortal.initial_r - 0.3 * sin(phi)
-    }
+  override def setColorFromWorld(): Portal = {
+    val result = super.setColorFromWorld()
+    color = new Vector3[Float](color.r * 0.9f, color.g * 0.9f, color.b * 0.9f)
+    result
   }
 }
