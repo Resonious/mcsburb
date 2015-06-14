@@ -122,6 +122,7 @@ object StructCommand extends ActiveCommand {
       state.corner2    = coords
       state.gotCorner2 = true
       player chat "Grabbed corner 2. Now run '/struct make <blacklist>'"
+      player chat "Do not run setground or setspawn until you run make"
     } else {
       player chat "You already have a structure ready! Run '/struct make <blacklist>'"
     }
@@ -265,13 +266,15 @@ object StructCommand extends ActiveCommand {
     state.corner1 match {
       case (x1, y1, z1) => state.corner2 match {
         case (x2, y2, z2) => {
-          // TODO test that this actually works (SburbGame.PlayerHouse currently does not use it)
+          // Does this work?
           state.lastStruct.spawnPoint.x = player.posX.intValue - math.min(x1, x2)
           state.lastStruct.spawnPoint.y = player.posY.intValue - math.min(y1, y2)
           state.lastStruct.spawnPoint.z = player.posZ.intValue - math.min(z1, z2)
         }
       }
     }
+
+    player chat "Set that spawn point! "+state.lastStruct.spawnPoint.disp
   }
 
   override def processCommand(sender: ICommandSender, args: Array[String]): Unit = {
@@ -290,6 +293,8 @@ object StructCommand extends ActiveCommand {
             load(player, if (args.length > 1) args(1) else "structure.sst")
           else if (args(0) equalsIgnoreCase "setground")
             setground(player)
+          else if (args(0) equalsIgnoreCase "setspawn")
+            setspawn(player)
           else
             player chat "Dunno what you mean by "+args(0)
         else

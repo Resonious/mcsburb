@@ -13,7 +13,7 @@ import scala.collection.mutable.HashMap
 
 // import li.cil.oc.common.tileentity.Case
 import li.cil.oc
-import li.cil.oc
+import net.minecraftforge.common.util.ForgeDirection
 import net.minecraft.item.ItemStack
 import net.resonious.sburb.abstracts.PacketPipeline
 import net.resonious.sburb.game.After
@@ -192,6 +192,27 @@ object Structure {
             tagComp.setTag("computerCase", teSave)
           }
 
+          // TODO the idea is to make it so multiple instances of a house can be spawned, but ugh.
+          /*
+          case rot: oc.api.internal.Rotatable => {
+            // Do keep rotation (screens and stuff will be messed up otherwise)
+            rot.facing match {
+              case ForgeDirection.UP | ForgeDirection.DOWN => {
+                teSave.setInteger("oc:yaw", ForgeDirection.NORTH.ordinal)
+                teSave.setInteger("oc:pitch", rot.facing.ordinal)
+              }
+              case _ => {
+                teSave.setInteger("oc:yaw", rot.facing.ordinal)
+                teSave.setInteger("oc:pitch", ForgeDirection.NORTH.ordinal)
+              }
+            }
+          }
+
+          case opencomputersEnv: oc.api.network.Environment => {
+            // Write nothing
+          }
+          */
+
           case _ => writeNormally()
         }
       }
@@ -318,8 +339,8 @@ class Structure(
   // of the structure.
   var centerOffset = new Vector3[Int]
 
-  // Optional spawn point position relative to center.
-  var spawnPoint = new Vector3[Int]
+  // Optional spawn point position relative to smallest corner.
+  var spawnPoint = new Vector3[Int](1, 1, 1)
 
   // Here lies the "real" constructor logic for this class. I'd refactor it, but
   // why fix what's not broken at this point.
