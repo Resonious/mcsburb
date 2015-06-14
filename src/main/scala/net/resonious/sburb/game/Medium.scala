@@ -80,6 +80,16 @@ object Medium {
       Map("minecraft:dirt" -> 'ignore)
     )
     savedHouse.centerOffset.y = house.centerY
+    savedHouse.spawnPoint = new Vector3[Int](
+      house.spawn.x - house.minX,
+      house.spawn.y - house.minY,
+      house.spawn.z - house.minZ
+      // I think this is good
+    )
+
+    // Keeping this flag around so that maybe we can tell the player that it's being worked on
+    // if they're antsy and clicking buttons a lot.
+    playerEntry.houseCurrentlyBeingMoved = true
 
     // I guess grabbing the structure AND generating the world in one tick is
     // just too much.
@@ -101,22 +111,27 @@ object Medium {
 
       symbols ++= List("DenseOres", "Caves", "BioConSingle")
 
-      val terrain = Array(
-        "TerrainNormal", "TerrainAplified", "TerrainEnd", "Skylands"
-      )
-      symbols += terrain(rand.nextInt(terrain.length))
-
       val obstructions = Array(
         "TerModSpheres", "FloatIslands", "Tendrils", "Obelisks",
         "StarFissure", "HugeTrees", "GenSpikes", "CryForm"
       )
       symbols ++= twoFrom(obstructions)
+      val hasFloatIslands = symbols contains "FloatIslands"
 
-      val exploration = Array(
-        "Villages", "NetherFort", "Mineshafts", "Dungeons",
-        "Ravines", "LakesDeep"
-      )
-      symbols ++= twoFrom(exploration)
+      if (!hasFloatIslands) {
+
+        val terrain = Array(
+          "TerrainNormal", "TerrainAplified", "TerrainEnd", "Skylands"
+        )
+        symbols += terrain(rand.nextInt(terrain.length))
+
+        val exploration = Array(
+          "Villages", "NetherFort", "Mineshafts", "Dungeons",
+          "Ravines", "LakesDeep"
+        )
+        symbols ++= twoFrom(exploration)
+
+      }
 
       val colors = List(
         "ModBlack", "ModRed", "ModGreen", "ModBlue",
@@ -142,7 +157,7 @@ object Medium {
         case None => color
       }
 
-      if (rand.nextInt(5) == 1) {
+      if (rand.nextInt(7) == 1) {
         // Totally random colors for everything.
         symbols ++= List(
           colors(rand.nextInt(colors.length)), "ColorFog",
@@ -185,9 +200,6 @@ object Medium {
         .asInstanceOf[java.util.List[ItemStack]]
 
       playerEntry.mediumId = dimensionId
-      // Keeping this flag around so that maybe we can tell the player that it's being worked on
-      // if they're antsy and clicking buttons a lot.
-      playerEntry.houseCurrentlyBeingMoved = true
 
       // Force Mystcraft to generate the world,
       val dummyPig = new EntityPig(player.worldObj)
@@ -224,17 +236,24 @@ object Medium {
             pointOfInterest.y = 150
             pointOfInterest.y = groundLevelAt(newWorld, pointOfInterest)
           }
-          age.cruft.put("poi1-x", new NBTTagInt(pointOfInterest.x))
-          age.cruft.put("poi1-y", new NBTTagInt(pointOfInterest.y))
-          age.cruft.put("poi1-z", new NBTTagInt(pointOfInterest.z))
-          age.markDirty()
+          playerEntry.mediumPointOfInterest = new Vector3[Int](pointOfInterest)
 
           val portal = new HousePortal(newWorld)
           portal.targetPos = pointOfInterest
           portal.targetDim = dimensionId
           portal.setColorFromString(color.replace("Mod", ""))
-          portal.setPosition(point.x, point.y + 25, point.z)
+          val portalY = groundLevelAt(newWorld, point.instead(_.y += 30)) + 10
+          portal.setPosition(point.x, portalY, point.z)
           newWorld.spawnEntityInWorld(portal)
+
+          playerEntry.lastPortalSpot = new Vector3[Int](point.x, portalY, point.z)
+
+          playerEntry eachClient { clientEntry =>
+            if (clientEntry.mediumId != 0) spawnPortalsToMedium(clientEntry, playerEntry)
+          }
+          playerEntry eachServer { serverEntry =>
+            if (serverEntry.mediumId != 0) spawnPortalsToMedium(playerEntry, serverEntry)
+          }
 
           startPlacingStuff(newWorld, playerEntry)
 
@@ -264,6 +283,30 @@ object Medium {
         }
       }
     }
+  }
+
+  def spawnPortalsToMedium(from: SburbGame.PlayerEntry, to: SburbGame.PlayerEntry): Unit = {
+    val portalDistance = 30
+    val fromWorld = DimensionManager.getWorld(from.mediumId)
+    val toWorld   = DimensionManager.getWorld(to.mediumId)
+
+    from.lastPortalSpot.y += portalDistance
+
+    val portalToHouse = new HousePortal(fromWorld)
+    portalToHouse.targetPos = new Vector3[Int](to.house.spawn)
+    portalToHouse.targetDim = to.mediumId
+    portalToHouse.setColorFromWorld()
+    portalToHouse.setPosition(from.lastPortalSpot.x, from.lastPortalSpot.y, from.lastPortalSpot.z)
+    fromWorld.spawnEntityInWorld(portalToHouse)
+
+    from.lastPortalSpot.y += portalDistance
+
+    val portalToPoi = new HousePortal(fromWorld)
+    portalToPoi.targetPos = new Vector3[Int](to.mediumPointOfInterest)
+    portalToPoi.targetDim = to.mediumId
+    portalToPoi.setColorFromWorld()
+    portalToPoi.setPosition(from.lastPortalSpot.x, from.lastPortalSpot.y, from.lastPortalSpot.z)
+    fromWorld.spawnEntityInWorld(portalToPoi)
   }
 
   def groundLevelAt(world: World, point: Vector3[Int]): Int = {
@@ -341,11 +384,7 @@ object Medium {
     After(1, 'second) execute {
       val age = AgeData.getAge(world.provider.dimensionId, false)
 
-      poi1 = new Vector3[Int](
-        age.cruft.get("poi1-x").asInstanceOf[NBTTagInt].func_150287_d(),
-        age.cruft.get("poi1-y").asInstanceOf[NBTTagInt].func_150287_d(),
-        age.cruft.get("poi1-z").asInstanceOf[NBTTagInt].func_150287_d()
-      )
+      poi1 = new Vector3[Int](gameEntry.mediumPointOfInterest)
 
       val returnNode1Pos = new Vector3[Int](
         poi1.x + randomRange(10),
@@ -359,7 +398,7 @@ object Medium {
     }
 
     After(2, 'seconds) execute {
-      for (i <- 0 until 55) {
+      for (i <- 0 until 100) {
         val spawn = gameEntry.house.spawn
 
         val returnNodeSpot = new Vector3[Int](
@@ -380,7 +419,7 @@ object Medium {
 
     // Find caves!
     After(3, 'seconds) execute {
-      for (i <- 0 until 55) {
+      for (i <- 0 until 100) {
         After(i*2, 'ticks) execute {
           val spawn = gameEntry.house.spawn
 

@@ -41,7 +41,7 @@ object DummyBlock extends ActiveBlock("Dummy") {
         world.func_147480_a(p.x,p.y,p.z, false)
         world.removeTileEntity(p.x,p.y,p.z)
       }
-      case _ =>
+      case _ => Sburb log "No dummy???"
     }
     world.removeTileEntity(x,y,z)
   }

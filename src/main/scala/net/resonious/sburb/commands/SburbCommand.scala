@@ -270,6 +270,7 @@ object SburbCommand extends ActiveCommand {
 
   @Command
   def medium(player: EntityPlayer, args: Array[String]): Unit = {
+    if (!(player.getCommandSenderName == "Metreck" || player.getCommandSenderName == "joe42542")) return
     Medium.generate(player)
   }
 

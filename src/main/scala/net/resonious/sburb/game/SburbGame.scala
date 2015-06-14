@@ -139,6 +139,11 @@ object SburbGame {
     var server, client = ""
     var mediumId = 0
     var mediumColor: String = null
+    var mediumPointOfInterest: Vector3[Int] = null
+
+    // Accessed by Medium.scala
+    var lastPortalSpot: Vector3[Int] = null
+
     // Assigned by teleporting to medium, accessed in SburbProperties#onJoin.
     // This is in case the player crashes while house is generating.
     var spawnPointDirty = false
@@ -152,10 +157,33 @@ object SburbGame {
     val grist = new HashMap[Grist.Value, Long]
     val house: PlayerHouse = h
     
-    def hasServer = !server.isEmpty
-    def hasClient = !client.isEmpty
-    def serverEntry = game entryOf server
-    def clientEntry = game entryOf client
+    final def hasServer = !server.isEmpty
+    final def hasClient = !client.isEmpty
+    final def serverEntry = game entryOf server
+    final def clientEntry = game entryOf client
+    final def tryServerEntry = game tryEntryOf server
+    final def tryClientEntry = game tryEntryOf client
+
+    final def eachServer(f: (PlayerEntry) => Unit): Unit = {
+      tryServerEntry match {
+        case Some(s) => {
+          f(s)
+          if (s.server == name) return
+          else s.eachServer(f)
+        }
+        case None => return
+      }
+    }
+    final def eachClient(f: (PlayerEntry) => Unit): Unit = {
+      tryClientEntry match {
+        case Some(s) => {
+          f(s)
+          if (s.client == name) return
+          else s.eachClient(f)
+        }
+        case None => return
+      }
+    }
     
     // Gets the entities of the client / server players if they are online.
     def serverPlayer = 
@@ -207,11 +235,9 @@ object SburbGame {
       centerY = struct.centerOffset.y
       minY = point.y - struct.centerOffset.y
 
-      // TODO have the spawn be specified in the structure or something
-      // _spawn = point instead { p => p.y += 3; p.z -= 1 }
-      _spawn.x = minX + 1
-      _spawn.y = point.y + 1
-      _spawn.z = minZ + 1
+      _spawn.x = minX + struct.spawnPoint.x
+      _spawn.y = minY + struct.spawnPoint.y
+      _spawn.z = minZ + struct.spawnPoint.z
 
       // Some houses are small and not comfortable for the server player to move
       // around within the boundary.
@@ -269,7 +295,7 @@ object SburbGame {
           Sburb log "Try #"+tryCount+" - couldn't find any good spot."
 
           if (takingTooLong != null) takingTooLong(tryCount)
-          if (tryCount >= 3) {
+          if (tryCount >= 2) {
             if (_whenFailedToPlace == null)
               throw new SburbException("Tried 3 TIMES TO PLACE A DAMN HOUSE. BRUH.")
             else {
@@ -356,7 +382,7 @@ class SburbGame(gid: String = "") extends Serializable {
 
   @transient var currentlySaving = false
   
-  private var players = new HashMap[String, PlayerEntry]
+  var players = new HashMap[String, PlayerEntry]
   
   def takenHouseNames = players.values map { _.house.name }
   
@@ -470,7 +496,7 @@ class SburbGame(gid: String = "") extends Serializable {
   }
   
   // Get player entry of the given player, or throw exception if it isn't there
-  def entryOf(plr: Any) = {
+  final def entryOf(plr: Any) = {
     val aname = plr match {
       case entityPlr: EntityPlayer => entityPlr.getGameProfile.getName
       case str: String => str
@@ -482,6 +508,12 @@ class SburbGame(gid: String = "") extends Serializable {
       players(name)
     } catch {
       case e: NoSuchElementException => throw new SburbException("There is no entry for "+name+" in game "+gameId) 
+    }
+  }
+
+  final def tryEntryOf(plr: Any): Option[PlayerEntry] = {
+    try Some(entryOf(plr)) catch {
+      case e: SburbException => None
     }
   }
   
