@@ -72,3 +72,5 @@ In case you plan to peek at the source code
 First thing is that some things are kind of weirdly organized. I did some experimentation on code organization early on and never actually cleaned up after myself. There's also some weird stuff that's a result of me playing around with Scala features that seemed novel to me at the time.
 
 Basically this is just a weekend/freetime project, so my focus is more on getting the thing working than being meticulous. That said, I do try to keep the code itself efficient and readable, even if it's disorganized.
+
+And lastly, you may notice the dinkyman namespace. That is for a friend of mine who is still somewhat of a beginner Java programmer.
