@@ -17,6 +17,8 @@ eclipse/
 *.class
 *.log
 
+libs/
+
 server.bat
 
 .cache
