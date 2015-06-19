@@ -7,6 +7,7 @@ gradle-app.setting
 
 
 ### Scala ###
+<<<<<<< HEAD
 *.class
 *.log
 
@@ -19,11 +20,13 @@ eclipse/
 
 libs/
 
+=======
+*.class
+*.log
+
 server.bat
 
-.cache
 **/.gradle
-eclipse
 .settings
 local.properties
 gradle.properties
