@@ -72,7 +72,7 @@ object SburbCommand extends ActiveCommand {
 	override def getCommandName() = "sburb"
 
 	override def getCommandUsage(sender: ICommandSender) = {
-		"ask nigel"
+          "ask nigel"
 	}
 
 	override def getCommandAliases() = List("sburb").asJava
@@ -96,8 +96,7 @@ object SburbCommand extends ActiveCommand {
 	}
 
 	override def canCommandSenderUseCommand(sender: ICommandSender) = {
-    // sender.getCommandSenderName == "Metreck"
-    true
+    sender.getCommandSenderName == "Metreck"
   }
 
 	override def addTabCompletionOptions(sender: ICommandSender, args: Array[String]) = {
