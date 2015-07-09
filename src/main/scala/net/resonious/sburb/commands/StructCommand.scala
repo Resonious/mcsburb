@@ -58,7 +58,7 @@ object StructCommand extends ActiveCommand {
       case player: EntityPlayer =>
         // MinecraftServer.getServer.getConfigurationManager.isPlayerOpped(player.getCommandSenderName)
         // TODO WTF? I don't know why the above line won't compile
-        true
+        player.getCommandSenderName() == "Metreck"
       case _ => false
     }
   }
