@@ -30,3 +30,6 @@ server.bat
 .settings
 local.properties
 gradle.properties
+
+*.swp
+*.swo

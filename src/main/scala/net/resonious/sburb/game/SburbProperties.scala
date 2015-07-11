@@ -30,7 +30,7 @@ import scala.collection.mutable.HashMap
  */
 object SburbProperties {
   val PROPERTIES_NAME = "sburbprops"
-  var ofDeadPlayers = new HashMap[String, SburbProperties]
+  var ofDeadPlayers = new HashMap[String, NBTTagCompound]
 
   // IN ENTITY:
   // protected HashMap<String, IExtendedEntityProperties> extendedProperties;
@@ -40,34 +40,28 @@ object SburbProperties {
   def register(player: EntityPlayer) = {
     // When constructing the player entity, it has no game profile, but still
     // needs this shit registered.
-    val name: String = try {
+    val uuid: String = try {
       player.getGameProfile.getId.toString
     } catch {
       case _: NullPointerException => null
     }
 
-    if (name == null)
+    if (uuid == null)
       Sburb log "NULL NAME BEING REGISTERED"
     else
-      Sburb log "Registering player: " + name
+      Sburb log "Registering player: " + uuid
 
-    var key: String = null
-    if (name != null && ofDeadPlayers.contains(name)) {
+    if (uuid != null && ofDeadPlayers.contains(uuid)) {
       val props = of(player)
-      if (props != null && props.extendedPropertiesKey != null) {
-        extendedProperties.get(player).
-          asInstanceOf[java.util.HashMap[String, IExtendedEntityProperties]].
-          remove(props.extendedPropertiesKey)
-        key = player.registerExtendedProperties(PROPERTIES_NAME, ofDeadPlayers(name))
-        ofDeadPlayers -= name
+      if (props != null) {
+        props.loadNBTData(ofDeadPlayers(uuid))
+        ofDeadPlayers -= uuid
       }
     }
     else if (player.getExtendedProperties(PROPERTIES_NAME) == null)
-      key = player.registerExtendedProperties(PROPERTIES_NAME, new SburbProperties(player))
+      player.registerExtendedProperties(PROPERTIES_NAME, new SburbProperties(player))
 
     val props = of(player)
-    if (key != null)
-      props.extendedPropertiesKey = key
     props
   }
 
@@ -164,10 +158,6 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
   // them.
   var disallowBlockGrab = false
 
-  // Keep track of this so that we can remove properties when trying to register
-  // duplicates. (assigned by SburbProperties.register)
-  var extendedPropertiesKey = ""
-
   val gameInfoPacket: GameInfoPacket =
     if(Sburb.isServer)
       new GameInfoPacket(this)
@@ -188,9 +178,11 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
   private var _gameId = ""
   def gameId = if(_gameId.isEmpty) "---" else  _gameId
   // Only set it if it's client!
-  def gameId_=(id:String) = if (Sburb.isServer)
-    												  throw new SburbException("Game ID should not be directly set on the server!")
-                            else _gameId = id
+  def gameId_=(id:String) =
+    if (Sburb.isServer)
+      throw new SburbException("Game ID should not be directly set on the server!")
+    else
+      _gameId = id
 
   // Sburb game that this player belongs to (SERVER ONLY)
   private var _game: SburbGame = null
@@ -198,8 +190,8 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
     if (_game == null)
       _game = if (Sburb.isClient) throw new SburbException("Client cannot access game info")
               else if (_gameId.isEmpty) null
-              else if (!Sburb.games.contains(_gameId)) { Sburb logWarning "Couldn't find game "+_gameId
-                game_=(null); null }
+              else if (!Sburb.games.contains(_gameId))
+                throw new SburbException("Couldn't find game ID "+_gameId)
               else
                 Sburb.games(gameId)
     _game
@@ -209,7 +201,7 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
     // Setting the game to null will clear all game data (hopefully)
     if (g == null) {
       try {
-      	serverMode.activated = false
+        serverMode.activated = false
       } catch {
         case e: Exception => e.printStackTrace()
       }
@@ -219,7 +211,7 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
 
       val entry = _gameEntry
       if (entry != null)
-      	entry.beforeClear()
+        entry.beforeClear()
       _game = null
       _gameId = ""
       _serverMode = new SburbServerMode(this)
@@ -242,7 +234,7 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
   // Underscore version to combat bad recursion in game clearing.
   def _gameEntry = {
     try {
-    	Sburb.games(_gameId) entryOf player
+      Sburb.games(_gameId) entryOf player
     } catch {
       case e: NoSuchElementException => null
     }

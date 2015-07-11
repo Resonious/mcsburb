@@ -49,6 +49,7 @@ import net.resonious.sburb.blocks.MultiBlock
 import net.resonious.sburb.blocks.GristShopItem
 import net.minecraftforge.common.ForgeChunkManager
 import net.minecraftforge.common.ForgeChunkManager.Ticket
+import net.minecraft.nbt.NBTTagCompound
 
 object ForgeEvents extends ForgeChunkManager.LoadingCallback {
   private var inited = false
@@ -64,19 +65,19 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
     Sburb log "lol tickets"
   }
 
-	@SubscribeEvent
-	def onEntityJoinWorldEvent(event: EntityJoinWorldEvent) = {
-	  event.entity match {
-	    case player: EntityPlayer => {
+  @SubscribeEvent
+  def onEntityJoinWorldEvent(event: EntityJoinWorldEvent) = {
+    event.entity match {
+      case player: EntityPlayer => {
         // Call `register` here instead of `of` in case the player died and the
         // properties need to be reassigned.
         val props = SburbProperties register player
 
-	      props.onJoin()
-	    }
-	    case _ =>
-	  }
-	}
+        props.onJoin()
+      }
+      case _ =>
+    }
+  }
 
   @SubscribeEvent
   def onLivingUpdateEvent(event: LivingUpdateEvent) = {
@@ -148,9 +149,9 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
         }
 
         val clientsGrist = if (Sburb.isServer)
-          								   props.gameEntry.clientEntry.grist(Grist.Build)
-          								 else
-          								   props.serverMode.clientsBuildGrist
+                             props.gameEntry.clientEntry.grist(Grist.Build)
+                           else
+                             props.serverMode.clientsBuildGrist
         val world = event.entityPlayer.getEntityWorld
         val block = world.getBlock(event.x, event.y, event.z)
         val meta = world.getBlockMetadata(event.x, event.y, event.z)
@@ -188,7 +189,7 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
   def onLivingDeathEvent(event: LivingDeathEvent) = {
     // TODO I guess add different grist types
     if (Sburb.isServer)
-    	event.entityLiving.dropItem(
+      event.entityLiving.dropItem(
         Grist.item(Grist.Build),
         Random.nextInt(event.entityLiving.getMaxHealth.ceil.toInt)
       )
@@ -196,7 +197,9 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
     if (event.entityLiving.isInstanceOf[EntityPlayer]) {
       val player = event.entityLiving.asInstanceOf[EntityPlayer]
       val props = SburbProperties of player
-      SburbProperties.ofDeadPlayers(player.getGameProfile.getId.toString) = props
+      val comp = new NBTTagCompound
+      props.saveNBTData(comp)
+      SburbProperties.ofDeadPlayers(player.getGameProfile.getId.toString) = comp
     }
   }
 
@@ -215,29 +218,29 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
         }
       }) foreach { game =>
         if (game != null)
-        	game.save()
+          game.save()
       }
     }
   }
 
-	@SideOnly(Side.CLIENT)
-	@SubscribeEvent
-	def onMouseEvent(event: MouseEvent) = {
-	  //if (event.dwheel >= 120)
-	  //  event.setCanceled(true)
-	}
+  @SideOnly(Side.CLIENT)
+  @SubscribeEvent
+  def onMouseEvent(event: MouseEvent) = {
+    //if (event.dwheel >= 120)
+    //  event.setCanceled(true)
+  }
 
-	private var renderers = new HashSet[Renderer]
-	@SideOnly(Side.CLIENT) def addRenderer(g: Renderer) = renderers += g
-	@SideOnly(Side.CLIENT) def removeRenderer(g: Renderer) = renderers -= g
-	@SideOnly(Side.CLIENT)
-	@SubscribeEvent
-	def onRenderGameOverlay(event: RenderGameOverlayEvent.Post):Unit = {
-	  if (event.isCancelable() || event.`type` != ElementType.EXPERIENCE) {
-			return
-		}
-	  renderers foreach { _.render(event.resolution)	}
-	}
+  private var renderers = new HashSet[Renderer]
+  @SideOnly(Side.CLIENT) def addRenderer(g: Renderer) = renderers += g
+  @SideOnly(Side.CLIENT) def removeRenderer(g: Renderer) = renderers -= g
+  @SideOnly(Side.CLIENT)
+  @SubscribeEvent
+  def onRenderGameOverlay(event: RenderGameOverlayEvent.Post):Unit = {
+    if (event.isCancelable() || event.`type` != ElementType.EXPERIENCE) {
+      return
+    }
+    renderers foreach { _.render(event.resolution)  }
+  }
 }
 
 object FmlEvents {
@@ -256,26 +259,26 @@ object FmlEvents {
   def onTick(event: TickEvent.ClientTickEvent) = TimedEvent.tick()
 
   @SideOnly(Side.CLIENT)
-	@SubscribeEvent
-	def onKeyInputEvent(event: KeyInputEvent) = {
+  @SubscribeEvent
+  def onKeyInputEvent(event: KeyInputEvent) = {
     def packet(s: String) = { var p = new TestPacket; p.msg = s; p }
 
-	  if (Keys.debug.isPressed) {
-	    Sburb log "Sent out to server"
-	    PacketPipeline.sendToServer(packet("From keypress (client)"))
-	  }
-	  if (Keys.debug2.isPressed) {
-	    Sburb log "Sent out to all"
-	    // PacketPipeline.sendToAll(packet("From keypress to all!"))
-	  }
-	  if (Keys.gristShop.isPressed) {
-	    val plr = Minecraft.getMinecraft.thePlayer
-	    if ((SburbProperties of plr).serverMode.activated) {
-  	    plr.closeScreen()
-  	    GristShopGui.open()
-	    }
-	  }
-	}
+    if (Keys.debug.isPressed) {
+      Sburb log "Sent out to server"
+      PacketPipeline.sendToServer(packet("From keypress (client)"))
+    }
+    if (Keys.debug2.isPressed) {
+      Sburb log "Sent out to all"
+      // PacketPipeline.sendToAll(packet("From keypress to all!"))
+    }
+    if (Keys.gristShop.isPressed) {
+      val plr = Minecraft.getMinecraft.thePlayer
+      if ((SburbProperties of plr).serverMode.activated) {
+        plr.closeScreen()
+        GristShopGui.open()
+      }
+    }
+  }
 
   @SideOnly(Side.SERVER)
   @SubscribeEvent
