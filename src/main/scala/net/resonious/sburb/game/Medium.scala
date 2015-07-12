@@ -50,10 +50,10 @@ import net.minecraft.nbt.NBTTagInt
 import net.minecraft.block.Block
 import greymerk.roguelike.catacomb.Catacomb
 import greymerk.roguelike.citadel.Citadel
-import greymerk.roguelike.catacomb.settings.CatacombSettingsBlank
-import greymerk.roguelike.catacomb.settings.CatacombSettingsBlank
 import greymerk.roguelike.worldgen.Coord
 import greymerk.roguelike.catacomb.settings.SpawnCriteria
+import greymerk.roguelike.catacomb.settings.CatacombSettingsResolver
+import greymerk.roguelike.catacomb.settings.CatacombSettings
 import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsBasicLoot
 import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsColdTheme
 import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsDesertTheme
@@ -151,6 +151,9 @@ object Medium {
       classOf[MediumSettingsTempleTheme],
       classOf[MediumSettingsWitchTheme]
     )
+
+  val baseSettings = classOf[CatacombSettingsResolver].getDeclaredField("base")
+  baseSettings.setAccessible(true)
 
   def generate(player: EntityPlayer): Unit = {
     val props = SburbProperties of player
@@ -341,7 +344,7 @@ object Medium {
           playerEntry.mediumCatacombsThemes += rand.nextInt(18)
           playerEntry.mediumCatacombsThemes += rand.nextInt(18)
 
-          After(2, 'seconds) execute {
+          After(8, 'seconds) execute {
             Sburb log "Spawning THE DUNGEON"
             spawnDungeon(newWorld, rand, playerEntry.mediumCatacombsThemes,
               pointOfInterest.instead(
@@ -475,9 +478,11 @@ object Medium {
   def spawnDungeon(world: World, rand: Random, themes: ArrayBuffer[Int], pos: Vector3[Int]) {
     if (rand.nextInt(10) == 1) {
       // catacomb
-      val settingsClass = settingsClasses(themes(rand.nextInt(themes.length)))
-      Sburb log "dungeon class: "+settingsClass.toString
-      try Catacomb.generate(world, settingsClass.newInstance, pos.x, pos.z)
+      val theme = settingsClasses(themes(rand.nextInt(themes.length))).newInstance
+      val base = Medium.baseSettings.get(Catacomb.settingsResolver)
+      val settings = new CatacombSettings(base.asInstanceOf[CatacombSettings], theme.asInstanceOf[CatacombSettings])
+
+      try Catacomb.generate(world, settings, pos.x, pos.z)
       catch {
         case e: NullPointerException => { Sburb logError "Catacombs fucked up" }
       }
@@ -526,7 +531,7 @@ object Medium {
     }
 
     After(2, 'seconds) execute {
-      var dungeonCount = 0
+      var dungeonCount = 1
 
       for (i <- 0 until 100) {
         val spawn = gameEntry.house.spawn
@@ -543,8 +548,8 @@ object Medium {
         if (math.abs(zDif) < 50) returnNodeSpot.z += 100 * math.signum(zDif)
         returnNodeSpot.y = groundLevelAt(world, returnNodeSpot) + rand.nextInt(5)
 
-        if (rand.nextInt(7) == 1) {
-          After(dungeonCount, 'seconds) execute {
+        if (rand.nextInt(10) == 1) {
+          After(dungeonCount * 10, 'seconds) execute {
             val dungeonSpot = returnNodeSpot.instead(
               { v => { v.x += 75; v.z += 75 }}
             )

@@ -61,11 +61,47 @@ class GristShopContainer(player: EntityPlayer) extends Container {
 
   override def canInteractWith(player: EntityPlayer): Boolean = inventory.isUseableByPlayer(player)
 
+  def costOf(item: Any) = {
+    val possibleItem =
+      (if (item.isInstanceOf[ItemBlock])
+        if (item.asInstanceOf[ItemBlock].field_150939_a.isInstanceOf[MultiBlock])
+          item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[MultiBlock].item
+        else if (item.asInstanceOf[ItemBlock].field_150939_a.isInstanceOf[BlockStairs])
+          GristShopItem.blockField.get(
+            item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[BlockStairs]
+          ).asInstanceOf[GristShopItem]
+        else
+          item.asInstanceOf[ItemBlock].field_150939_a
+      else
+        item).asInstanceOf[GristShopItem]
+
+    possibleItem.cost
+  }
+
   // On shift-click. God fucking dammit.
-  // or is this right click?
-  override def transferStackInSlot(par1EntityPlayer: EntityPlayer, index: Int): ItemStack = {
-    // null
-    inventorySlots.get(index).asInstanceOf[Slot].getStack
+  override def transferStackInSlot(par1EntityPlayer: EntityPlayer, slot: Int): ItemStack = {
+    if (slot < 0 || slot >= INV_START) return null
+
+    val stack = inventory.getStackInSlot(slot)
+    if (stack == null) return null
+    val item = stack.getItem
+
+    // Acquire useful information
+    val props = SburbProperties of player
+    val clientsGrist = if (Sburb.isServer)
+                         props.gameEntry.clientEntry.grist(Grist.Build)
+                       else
+                         props.serverMode.clientsBuildGrist
+
+    // Confusing ass figuring out how to find the fucking cost
+    val cost = costOf(item)
+
+    val amount = (clientsGrist / cost).floor.toInt
+    if (amount > 0) {
+      stack.stackSize = amount
+      stack
+    }
+    else null
   }
 
   override def slotClick(slot: Int, button: Int, flag: Int, player: EntityPlayer): ItemStack = {
@@ -85,19 +121,7 @@ class GristShopContainer(player: EntityPlayer) extends Container {
                          props.serverMode.clientsBuildGrist
 
     // Confusing ass figuring out how to find the fucking cost
-    val possibleItem =
-      (if (item.isInstanceOf[ItemBlock])
-        if (item.asInstanceOf[ItemBlock].field_150939_a.isInstanceOf[MultiBlock])
-          item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[MultiBlock].item
-        else if (item.asInstanceOf[ItemBlock].field_150939_a.isInstanceOf[BlockStairs])
-          GristShopItem.blockField.get(
-            item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[BlockStairs]
-          ).asInstanceOf[GristShopItem]
-        else
-          item.asInstanceOf[ItemBlock].field_150939_a
-      else
-        item).asInstanceOf[GristShopItem]
-    val cost = possibleItem.cost
+    val cost = costOf(item)
 
     // Now only charge them if they can afford it!
     if (cost <= clientsGrist) {
