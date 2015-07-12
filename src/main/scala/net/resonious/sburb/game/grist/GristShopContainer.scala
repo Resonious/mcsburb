@@ -44,8 +44,8 @@ class GristShopContainer(player: EntityPlayer) extends Container {
   var count = 0
   for (i <- 0 until 3) {
     for (j <- 0 until 9) {
-    	this.addSlotToContainer(new GristShopSlot(inventory, count, 8 + j * 18, 27 + i * 18))
-    	count += 1
+      this.addSlotToContainer(new GristShopSlot(inventory, count, 8 + j * 18, 27 + i * 18))
+      count += 1
     }
   }
 
@@ -80,15 +80,15 @@ class GristShopContainer(player: EntityPlayer) extends Container {
     // Acquire useful information
     val props = SburbProperties of player
     val clientsGrist = if (Sburb.isServer)
-      								   props.gameEntry.clientEntry.grist(Grist.Build)
-      								 else
-      								   props.serverMode.clientsBuildGrist
+                         props.gameEntry.clientEntry.grist(Grist.Build)
+                       else
+                         props.serverMode.clientsBuildGrist
 
     // Confusing ass figuring out how to find the fucking cost
     val possibleItem =
       (if (item.isInstanceOf[ItemBlock])
         if (item.asInstanceOf[ItemBlock].field_150939_a.isInstanceOf[MultiBlock])
-        	item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[MultiBlock].item
+          item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[MultiBlock].item
         else if (item.asInstanceOf[ItemBlock].field_150939_a.isInstanceOf[BlockStairs])
           GristShopItem.blockField.get(
             item.asInstanceOf[ItemBlock].field_150939_a.asInstanceOf[BlockStairs]
@@ -96,7 +96,7 @@ class GristShopContainer(player: EntityPlayer) extends Container {
         else
           item.asInstanceOf[ItemBlock].field_150939_a
       else
-      	item).asInstanceOf[GristShopItem]
+        item).asInstanceOf[GristShopItem]
     val cost = possibleItem.cost
 
     // Now only charge them if they can afford it!

@@ -140,6 +140,7 @@ object SburbGame {
     var mediumId = 0
     var mediumColor: String = null
     var mediumPointOfInterest: Vector3[Int] = null
+    var mediumCatacombsThemes: ArrayBuffer[Int] = new ArrayBuffer[Int]
 
     // Accessed by Medium.scala
     var lastPortalSpot: Vector3[Int] = null

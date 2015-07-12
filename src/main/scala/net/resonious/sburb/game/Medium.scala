@@ -48,9 +48,110 @@ import net.minecraftforge.common.ForgeChunkManager
 import net.minecraft.nbt.NBTTagString
 import net.minecraft.nbt.NBTTagInt
 import net.minecraft.block.Block
+import greymerk.roguelike.catacomb.Catacomb
+import greymerk.roguelike.citadel.Citadel
+import greymerk.roguelike.catacomb.settings.CatacombSettingsBlank
+import greymerk.roguelike.catacomb.settings.CatacombSettingsBlank
+import greymerk.roguelike.worldgen.Coord
+import greymerk.roguelike.catacomb.settings.SpawnCriteria
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsBasicLoot
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsColdTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsDesertTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsEniTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsEthoTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsForestTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsJungleTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsMesaTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsMountainTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsPyramidTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsRooms
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsSecrets
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsSegments
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsSize
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsSwampTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsTaigaTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsTempleTheme
+import greymerk.roguelike.catacomb.settings.builtin.CatacombSettingsWitchTheme
+
 import scala.math
 
 object Medium {
+  class MediumSettingsBasicLoot extends CatacombSettingsBasicLoot {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsColdTheme extends CatacombSettingsColdTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsDesertTheme extends CatacombSettingsDesertTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsEniTheme extends CatacombSettingsEniTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsEthoTheme extends CatacombSettingsEthoTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsForestTheme extends CatacombSettingsForestTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsJungleTheme extends CatacombSettingsJungleTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsMesaTheme extends CatacombSettingsMesaTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsMountainTheme extends CatacombSettingsMountainTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsPyramidTheme extends CatacombSettingsPyramidTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsRooms extends CatacombSettingsRooms {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsSecrets extends CatacombSettingsSecrets {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsSegments extends CatacombSettingsSegments {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsSize extends CatacombSettingsSize {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsSwampTheme extends CatacombSettingsSwampTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsTaigaTheme extends CatacombSettingsTaigaTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsTempleTheme extends CatacombSettingsTempleTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+  class MediumSettingsWitchTheme extends CatacombSettingsWitchTheme {
+    override def isValid(world: World, coord: Coord): Boolean = true
+  }
+
+  val settingsClasses = Array(
+      classOf[MediumSettingsBasicLoot],
+      classOf[MediumSettingsColdTheme],
+      classOf[MediumSettingsDesertTheme],
+      classOf[MediumSettingsEniTheme],
+      classOf[MediumSettingsEthoTheme],
+      classOf[MediumSettingsForestTheme],
+      classOf[MediumSettingsJungleTheme],
+      classOf[MediumSettingsMesaTheme],
+      classOf[MediumSettingsMountainTheme],
+      classOf[MediumSettingsPyramidTheme],
+      classOf[MediumSettingsRooms],
+      classOf[MediumSettingsSecrets],
+      classOf[MediumSettingsSegments],
+      classOf[MediumSettingsSize],
+      classOf[MediumSettingsSwampTheme],
+      classOf[MediumSettingsTaigaTheme],
+      classOf[MediumSettingsTempleTheme],
+      classOf[MediumSettingsWitchTheme]
+    )
+
   def generate(player: EntityPlayer): Unit = {
     val props = SburbProperties of player
     if (!props.hasGame) {
@@ -225,7 +326,6 @@ object Medium {
           playerEntry.houseCurrentlyBeingMoved = false
           Sburb log "PLACING HOUSE INTO MEDIUM: DONE"
 
-          // TODO For now, just the one portal...
           val pointOfInterest = new Vector3[Int](
             house.spawn.x - 2000 + rand.nextInt(1000),
             150,
@@ -237,6 +337,18 @@ object Medium {
             pointOfInterest.y = groundLevelAt(newWorld, pointOfInterest)
           }
           playerEntry.mediumPointOfInterest = new Vector3[Int](pointOfInterest)
+
+          playerEntry.mediumCatacombsThemes += rand.nextInt(18)
+          playerEntry.mediumCatacombsThemes += rand.nextInt(18)
+
+          After(2, 'seconds) execute {
+            Sburb log "Spawning THE DUNGEON"
+            spawnDungeon(newWorld, rand, playerEntry.mediumCatacombsThemes,
+              pointOfInterest.instead(
+                { v => { v.x += 50; v.z += 50 }}
+              )
+            )
+          }
 
           val portal = new HousePortal(newWorld)
           portal.targetPos = pointOfInterest
@@ -360,6 +472,22 @@ object Medium {
     0
   }
 
+  def spawnDungeon(world: World, rand: Random, themes: ArrayBuffer[Int], pos: Vector3[Int]) {
+    if (rand.nextInt(10) == 1) {
+      // catacomb
+      val settingsClass = settingsClasses(themes(rand.nextInt(themes.length)))
+      Sburb log "dungeon class: "+settingsClass.toString
+      try Catacomb.generate(world, settingsClass.newInstance, pos.x, pos.z)
+      catch {
+        case e: NullPointerException => { Sburb logError "Catacombs fucked up" }
+      }
+    }
+    else {
+      // citadel
+      Citadel.generate(world, pos.x, pos.z)
+    }
+  }
+
   def spawnReturnNode(world: World, gameEntry: SburbGame.PlayerEntry, pos: Vector3[Int]) = {
     val returnNode = new ReturnNode(world)
     returnNode.setPosition(pos.x, pos.y, pos.z)
@@ -398,6 +526,8 @@ object Medium {
     }
 
     After(2, 'seconds) execute {
+      var dungeonCount = 0
+
       for (i <- 0 until 100) {
         val spawn = gameEntry.house.spawn
 
@@ -412,6 +542,17 @@ object Medium {
         if (math.abs(xDif) < 50) returnNodeSpot.x += 100 * math.signum(xDif)
         if (math.abs(zDif) < 50) returnNodeSpot.z += 100 * math.signum(zDif)
         returnNodeSpot.y = groundLevelAt(world, returnNodeSpot) + rand.nextInt(5)
+
+        if (rand.nextInt(7) == 1) {
+          After(dungeonCount, 'seconds) execute {
+            val dungeonSpot = returnNodeSpot.instead(
+              { v => { v.x += 75; v.z += 75 }}
+            )
+            Sburb log "DUNGEON @ "+dungeonSpot.disp
+            spawnDungeon(world, rand, gameEntry.mediumCatacombsThemes, dungeonSpot)
+          }
+          dungeonCount += 1
+        }
 
         spawnReturnNode(world, gameEntry, returnNodeSpot)
       }

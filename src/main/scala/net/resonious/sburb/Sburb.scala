@@ -50,25 +50,25 @@ import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.entity.EntityLivingBase
 import net.dinkyman.sburb.DMain
 
-@Mod(modid = "sburb", version = "0.0.0", modLanguage = "scala",
+@Mod(modid = "sburb", version = "0.0.1", modLanguage = "scala",
   dependencies = "required-after:OpenComputers@[1.5.0,)")
 object Sburb {
   @SidedProxy(modId="sburb",clientSide="net.resonious.sburb.proxy.ClientProxy",
                             serverSide="net.resonious.sburb.proxy.CommonProxy")
-	var proxy:CommonProxy = new CommonProxy
+  var proxy:CommonProxy = new CommonProxy
 
-	var logger: Logger = null
-	def log(msg: String) = logger.info(msg)
-	def logWarning(msg: String) = logger.warn(msg)
-	def logError(msg: String) = logger.error(msg)
+  var logger: Logger = null
+  def log(msg: String) = logger.info(msg)
+  def logWarning(msg: String) = logger.warn(msg)
+  def logError(msg: String) = logger.error(msg)
 
   val reflections = new Reflections("net.resonious.sburb")
 
-	private var _isClient = false
-	def isClient = _isClient
+  private var _isClient = false
+  def isClient = _isClient
 
-	private var _isServer = false
-	def isServer = _isServer
+  private var _isServer = false
+  def isServer = _isServer
 
   def playerOfName(name: String): EntityPlayerMP = {
     MinecraftServer.getServer.getConfigurationManager.playerEntityList foreach { player =>
@@ -93,7 +93,7 @@ object Sburb {
     }
   }
 
-	var games = new HashMap[String, SburbGame]
+  var games = new HashMap[String, SburbGame]
   def newGame(): SburbGame = {
     val game = new SburbGame
     games(game.gameId) = game
@@ -113,7 +113,7 @@ object Sburb {
         val f = clazz.getFields find { _.getName == "MODULE$" }
         if (f.isEmpty) null
         else f.get get null
-  	  }.filterNot(_==null)
+      }.filterNot(_==null)
   }
 
   @EventHandler
@@ -131,7 +131,7 @@ object Sburb {
     // Register items and blocks
     sortedSingletons(classOf[ActiveItem]) foreach {
       case item: ActiveItem =>
-      	GameRegistry.registerItem(item, item.getUnlocalizedName)
+        GameRegistry.registerItem(item, item.getUnlocalizedName)
     }
     Grist.generateGristItems foreach { item =>
       log("Registering grist item: "+item.getUnlocalizedName)
@@ -172,10 +172,6 @@ object Sburb {
       }
     }
     log("-----------")
-
-    // RenderPlayer
-    // if (isClient)
-    	// RenderPlayerAPI.register("sburb", classOf[SburbPlayerRenderer])
 
     // Network
     NetworkRegistry.INSTANCE.registerGuiHandler(this, proxy)
@@ -245,7 +241,5 @@ object Sburb {
       val game = SburbGame.load(f)
       if (game != null) games(game.gameId) = game
     }
-
-    // SburbGame.readHouseData(games.values)
   }
 }
