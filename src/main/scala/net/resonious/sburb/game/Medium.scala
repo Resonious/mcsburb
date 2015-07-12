@@ -476,7 +476,11 @@ object Medium {
   }
 
   def spawnDungeon(world: World, rand: Random, themes: ArrayBuffer[Int], pos: Vector3[Int]) {
-    if (rand.nextInt(10) == 1) {
+    if (rand.nextInt(15) == 1) {
+      // citadel
+      Citadel.generate(world, pos.x, pos.z)
+    }
+    else {
       // catacomb
       val theme = settingsClasses(themes(rand.nextInt(themes.length))).newInstance
       val base = Medium.baseSettings.get(Catacomb.settingsResolver)
@@ -486,10 +490,6 @@ object Medium {
       catch {
         case e: NullPointerException => { Sburb logError "Catacombs fucked up" }
       }
-    }
-    else {
-      // citadel
-      Citadel.generate(world, pos.x, pos.z)
     }
   }
 
