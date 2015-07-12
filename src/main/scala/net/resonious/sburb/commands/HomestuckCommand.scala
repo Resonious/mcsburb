@@ -26,8 +26,8 @@ import scala.math
 
 object HomestuckCommand extends ActiveCommand {
   override def getCommandName() = "homestuck"
-  override def getCommandUsage(sender: ICommandSender) = "/homestuck <house name>"
-  override def getCommandAliases() = List("homestuck", "hivebent").asJava
+  override def getCommandUsage(sender: ICommandSender) = "/homestuck [house name]"
+  override def getCommandAliases() = List("homestuck", "hivebent", "housetrapped").asJava
 
   override def canCommandSenderUseCommand(sender: ICommandSender) = {
     sender match {
@@ -45,8 +45,6 @@ object HomestuckCommand extends ActiveCommand {
   override def processCommand(sender: ICommandSender, args: Array[String]): Unit = {
     val player = sender.asInstanceOf[EntityPlayer]
 
-    val houseName = if (args.length > 0) args(0) else SburbGame.randomHouseName
-
     val props = SburbProperties of player
     if (props.hasGame) {
       if (props.gameEntry.houseCurrentlyBeingGenerated)
@@ -61,6 +59,9 @@ object HomestuckCommand extends ActiveCommand {
       case 1 => Sburb.games.values.iterator.next
       case _ => throw new SburbException("Don't know what to do with more than 1 game yet!")
     }
+
+    val houseName = if (args.length > 0) args(0) else game.randomHouseName
+
     if (game.newPlayer(player, houseName, true)) {
       // Keep track of this in case the player dies or something during the process...
       val playerName = player.getCommandSenderName
@@ -71,7 +72,7 @@ object HomestuckCommand extends ActiveCommand {
       gameEntry.houseCurrentlyBeingGenerated = true
 
       Sburb log "Generating "+house.name+" for "+player.getCommandSenderName
-      player chat "Generating house... Might take awhile."
+      player chat "Looking for a good spot to place your new house..."
 
       house onceLoaded { _ =>
         gameEntry.houseCurrentlyBeingGenerated = false

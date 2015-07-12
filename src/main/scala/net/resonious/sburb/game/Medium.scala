@@ -291,7 +291,8 @@ object Medium {
           compliment, "ColorCloud",
           compliment, "ColorSkyNight"
         )
-        if (rand.nextInt(3) == 1) symbols += "Rainbow"
+        if (rand.nextInt(7) == 1 || playerEntry.name == "lAnime")
+          symbols += "Rainbow"
       }
 
       // TODO the land of ?? and ??
@@ -390,8 +391,35 @@ object Medium {
 
         house.placeIntoWorld(savedHouse, newWorld, houseWasPlaced)
 
+        house whenTakingAwhile { numberOfAttempts =>
+          Sburb playerOfName playerName match {
+            case null => {
+              Sburb log "Still working on "+playerName+"'s medium house"
+            }
+
+            case player => {
+              try if (numberOfAttempts == 1)
+                  player chat "Medium still generating..."
+                else
+                  player chat "Sometimes this just takes an absurd amount of time. I'm sorry."
+              catch {
+                case e: Throwable =>
+              }
+            }
+          }
+        }
+
         house whenFailedToPlace { tryCount =>
           val newSpot = new Vector3[Int](0, 100, 0)
+
+          Sburb playerOfName playerName match {
+            case null => { }
+
+            case player => {
+              player chat "I'm afraid your medium may be void."
+            }
+          }
+
           Sburb log "Might be a blank world.. Placing house in the air somewhere."
           house.placeAt(savedHouse, newWorld, newSpot)
           houseWasPlaced(newSpot)
@@ -548,7 +576,7 @@ object Medium {
         if (math.abs(zDif) < 50) returnNodeSpot.z += 100 * math.signum(zDif)
         returnNodeSpot.y = groundLevelAt(world, returnNodeSpot) + rand.nextInt(5)
 
-        if (rand.nextInt(10) == 1) {
+        if (rand.nextInt(20) == 1) {
           After(dungeonCount * 10, 'seconds) execute {
             val dungeonSpot = returnNodeSpot.instead(
               { v => { v.x += 75; v.z += 75 }}

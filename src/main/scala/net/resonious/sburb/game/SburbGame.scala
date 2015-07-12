@@ -64,7 +64,7 @@ class HouseDoesNotExistException(houseName: String) extends SburbException(
 
 object SburbGame {
   val rand = new Random
-  final val builtInHouseNames = Array("amber", "kyle", "r1", "ryan")
+  final val builtInHouseNames = Array("amber", "kyle", "neokyle", "r1", "ryan", "travis")
 
   // Because writing `+ ".sburb"` is simply too much...
   implicit class SburbFileString(str: String) {
@@ -98,21 +98,6 @@ object SburbGame {
     }
   }
 
-  def randomHouseName(): String = {
-    val houseFiles =
-      (new File("houses")).listFiles(new FilenameFilter {
-        override def accept(_dir: File, name: String): Boolean = name contains ".sst"
-      }) match {
-        case null => Array[String]()
-
-        // case files => files(rand.nextInt(files.length)).getName.replace(".sst", "")
-        case files => files.map(_.getName.replace(".sst", ""))
-      }
-
-    val houseNames: Array[String] = houseFiles ++ builtInHouseNames
-    houseNames(rand.nextInt(houseNames.length))
-  }
-  
   // This is OLD SHIT.
   def readHouseData(games: Iterable[SburbGame]): Unit = {
     throw new SburbException("NO MORE HOUSES.DAT!")
@@ -301,11 +286,10 @@ object SburbGame {
               throw new SburbException("Tried 3 TIMES TO PLACE A DAMN HOUSE. BRUH.")
             else {
               _whenFailedToPlace(tryCount)
-              return
             }
           }
-
-          placeIntoWorld(struct, world, tryCount + 1, callback, takingTooLong)
+          else
+            placeIntoWorld(struct, world, tryCount + 1, callback, takingTooLong)
         }
       }
     }
@@ -414,6 +398,26 @@ class SburbGame(gid: String = "") extends Serializable {
   	rand.alphanumeric take 10 foreach { str += _ }
   	str
   } else gid
+
+  def randomHouseName(): String = {
+    val houseFiles =
+      (new File("houses")).listFiles(new FilenameFilter {
+        override def accept(_dir: File, name: String): Boolean = name contains ".sst"
+      }) match {
+        case null => Array[String]()
+
+        case files => files.map(_.getName.replace(".sst", ""))
+      }
+
+    val houseNames: Array[String] = houseFiles ++ SburbGame.builtInHouseNames
+    houseNames.filterNot(n => takenHouseNames.exists(_ == n)) match {
+      // If all houses are taken, then we have no choice...
+      case Array() => { houseNames(SburbGame.rand.nextInt(houseNames.length)) }
+      // Otherwise don't produce duplicates.
+      case availableHouses => { availableHouses(SburbGame.rand.nextInt(availableHouses.length)) }
+    }
+  }
+  
   
   // Assign a client-server relationship. Players will be created if they don't exist.
   // Also doesn't care whether or not these names are real players, so don't call this.
@@ -517,18 +521,13 @@ class SburbGame(gid: String = "") extends Serializable {
       case e: SburbException => None
     }
   }
-  
-  // Of course, save to the appropriate file
-  def save() = if (!currentlySaving) {
-    currentlySaving = true
-    Future {
-      var fileOut = new FileOutputStream(gameId.sburb)
-      var out = new ObjectOutputStream(fileOut)
-      
-      out.writeObject(this)
-      out.close()
 
-      currentlySaving = false
-    }
+  // Of course, save to the appropriate file
+  def save() = {
+    var fileOut = new FileOutputStream(gameId.sburb)
+    var out = new ObjectOutputStream(fileOut)
+
+    out.writeObject(this)
+    out.close()
   }
 }

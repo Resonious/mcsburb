@@ -127,7 +127,7 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
       val gitem = item.asInstanceOf[GristItem]
 
       props.gameEntry.grist(gitem.gristType) += stackSize
-      Sburb log "Grabbed "+stackSize+" "+gitem.gristType+" Grist  for "+player.getDisplayName+"!"
+      // Sburb log "Grabbed "+stackSize+" "+gitem.gristType+" Grist  for "+player.getDisplayName+"!"
       event.setResult(Result.ALLOW)
       event.item.setDead()
       props.gristPacket.sync(gitem.gristType)
