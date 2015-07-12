@@ -63,7 +63,9 @@ So, there are a couple of things that I decided were already being done well, so
 2. MystCraft - This is I guess more of a temporary solution. In the end, I would like to have more control over how The Medium is generated, but integrating MystCraft took way less time than both learning to do my own world generation AND implementing enough variety in the generation to make all Medium worlds unique.
 Now because these are not mine, I will not provide them with this mod. I will instead advise you to seek them out yourself.
 
-3. Reflections - What? [This](https://code.google.com/p/reflections/) java library. Why? Well, when the project was new, I got super sick of `someTypeOfRegistry.register(classOf[EveryGoddamnThing], blah, blah)` and thought to myself: it would be great if I could just loop through every subclass of some abstract and call the registry function just once. So yeah.
+3. [Roguelike Dungeons](https://github.com/Greymerk/minecraft-roguelike)!
+
+4. Reflections - What? [This](https://code.google.com/p/reflections/) java library. Why? Well, when the project was new, I got super sick of `someTypeOfRegistry.register(classOf[EveryGoddamnThing], blah, blah)` and thought to myself: it would be great if I could just loop through every subclass of some abstract and call the registry function just once. So yeah.
 
 I should just use the gradle.build to download dependencies, or make a script, but ... maybe later.
 
