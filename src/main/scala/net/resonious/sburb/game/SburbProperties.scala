@@ -255,6 +255,17 @@ class SburbProperties(_player: EntityPlayer) extends IExtendedEntityProperties {
           }
           gameEntry.spawnPointDirty = false
         }
+        else {
+          if (player.worldObj.provider.dimensionId == 0) {
+            if (gameEntry.mediumId != 0) {
+              Sburb log "Recovering"+player.getCommandSenderName+" from broken medium"
+              gameEntry.mediumId = 0
+              gameEntry.mediumColor = null
+            }
+            gameEntry.houseCurrentlyBeingMoved = false
+          }
+        }
+
         if (gameEntry.needsSburbDisc) {
           player.inventory.addItemStackToInventory(new ItemStack(SburbDisc, 1))
           gameEntry.needsSburbDisc = false

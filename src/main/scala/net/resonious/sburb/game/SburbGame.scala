@@ -15,8 +15,10 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 import scala.util.Random
+import scala.util.{Success, Failure}
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.annotation.meta.param
 
 import SburbGame._
 import net.minecraft.entity.player.EntityPlayer
@@ -68,7 +70,7 @@ object SburbGame {
 
   // Because writing `+ ".sburb"` is simply too much...
   implicit class SburbFileString(str: String) {
-  	def sburb() = str + ".sburb"
+    def sburb() = str + ".sburb"
   }
   
   // Load an SBURB game from a file
@@ -78,7 +80,7 @@ object SburbGame {
       case gid: String => gid.sburb
       case _ => throw new IllegalArgumentException("Can't load sburb game from " + param)
     }
-    
+
     try {
       var fileIn = new FileInputStream(fileName)
       var in = new ObjectInputStream(fileIn)
@@ -90,9 +92,8 @@ object SburbGame {
         new SburbGame
       }
       case e: Exception => {
-        Sburb logError "OH GOD THE SBURB FILE IS CORRUPT. KILL IT."
-          val f = new File(fileName)
-          f.delete()
+        Sburb logError "Corrupt sburb file: "+e.getMessage
+        new File(fileName).delete()
         null
       }
     }
@@ -193,7 +194,7 @@ object SburbGame {
     override def toString() = house.name+": "+str(server)+" -> "+str(name)+" -> "+str(client)
   }
   
-  class PlayerHouse(_name:String, world: World) extends Serializable {
+  class PlayerHouse(_name:String, @(transient @param) world: World) extends Serializable {
     var _spawn: Vector3[Int] = new Vector3[Int]
     var minX: Int = 0
     var maxX: Int = 0
@@ -205,7 +206,7 @@ object SburbGame {
     // Flag for SburbServerMode to know when to refetch spawn and dimension
     var wasMoved = false
 
-    @transient val rand = new Random
+    @transient lazy val rand = new Random
 
     def genTestCoord: Int = {
       // NOTE Random#nextInt gives from 0 to max, and we want some negatives too.
@@ -224,6 +225,9 @@ object SburbGame {
       _spawn.x = minX + struct.spawnPoint.x
       _spawn.y = minY + struct.spawnPoint.y
       _spawn.z = minZ + struct.spawnPoint.z
+
+      // TODO this is super lame, but quicker than fixing the structure file...
+      if (_name == "kyle") _spawn.y += 1
 
       // Some houses are small and not comfortable for the server player to move
       // around within the boundary.
@@ -394,9 +398,9 @@ class SburbGame(gid: String = "") extends Serializable {
   
   // If this is a new game; assign it a new game ID
   var gameId = if(gid.isEmpty) {
-  	var str = ""
-  	rand.alphanumeric take 10 foreach { str += _ }
-  	str
+    var str = ""
+    rand.alphanumeric take 10 foreach { str += _ }
+    str
   } else gid
 
   def randomHouseName(): String = {
@@ -523,11 +527,24 @@ class SburbGame(gid: String = "") extends Serializable {
   }
 
   // Of course, save to the appropriate file
-  def save() = {
-    var fileOut = new FileOutputStream(gameId.sburb)
-    var out = new ObjectOutputStream(fileOut)
+  def save() = if (!currentlySaving) {
+    currentlySaving = true
+    val gameData = this
 
-    out.writeObject(this)
-    out.close()
+    val saving = Future {
+      var fileOut = new FileOutputStream(gameData.gameId.sburb)
+      var out = new ObjectOutputStream(fileOut)
+
+      out.writeObject(gameData)
+      out.close()
+    }
+
+    saving onComplete {
+      case Success(_) => gameData.currentlySaving = false
+      case Failure(e) => {
+        Sburb logError "ERROR WHILE SAVING: "+e.getMessage
+        gameData.currentlySaving = false
+      }
+    }
   }
 }

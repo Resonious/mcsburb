@@ -217,8 +217,7 @@ object ForgeEvents extends ForgeChunkManager.LoadingCallback {
           case _ => throw new SburbException("How is there a non-player in this list?")
         }
       }) foreach { game =>
-        if (game != null)
-          game.save()
+        if (game != null) game.save()
       }
     }
   }
