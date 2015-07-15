@@ -364,14 +364,27 @@ object Medium {
 
           playerEntry.lastPortalSpot = new Vector3[Int](point.x, portalY, point.z)
 
+          Sburb log "=== Placing portals TO the new medium ==="
           playerEntry eachClient { clientEntry =>
-            if (clientEntry.mediumId != 0 && clientEntry.lastPortalSpot != null)
+            if (clientEntry.mediumId != 0 && clientEntry.lastPortalSpot != null) {
+              Sburb log "Placing portal in "+clientEntry.name+"'s medium"
               spawnPortalsToMedium(clientEntry, playerEntry)
+            }
+            else {
+              Sburb log clientEntry.name+" has no medium in which to place a protal"
+            }
           }
+          Sburb log "=== Placing portals IN the new medium ==="
           playerEntry eachServer { serverEntry =>
-            if (serverEntry.mediumId != 0 && serverEntry.lastPortalSpot != null)
+            if (serverEntry.mediumId != 0 && serverEntry.lastPortalSpot != null) {
+              Sburb log "Placing portal to "+clientEntry.name+"'s medium"
               spawnPortalsToMedium(playerEntry, serverEntry)
+            }
+            else {
+              Sburb log "Player "+serverEntry.name+" has no medium yet - no portal"
+            }
           }
+          Sburb log "=== DONE placing portals ==="
 
           startPlacingStuff(newWorld, playerEntry)
 

@@ -72,7 +72,7 @@ object SburbGame {
   implicit class SburbFileString(str: String) {
     def sburb() = str + ".sburb"
   }
-  
+
   // Load an SBURB game from a file
   def load(param: Any) = {
     val fileName = param match {
@@ -84,7 +84,7 @@ object SburbGame {
     try {
       var fileIn = new FileInputStream(fileName)
       var in = new ObjectInputStream(fileIn)
-      
+
       in.readObject().asInstanceOf[SburbGame].onLoad()
     } catch {
       case e: FileNotFoundException => {
@@ -103,7 +103,7 @@ object SburbGame {
   def readHouseData(games: Iterable[SburbGame]): Unit = {
     throw new SburbException("NO MORE HOUSES.DAT!")
   }
-  
+
   // The place to throw people who aren't playing SBURB.
   // I don't think this is even used.
   var defaultSpawn = new Vector3[Int]
@@ -116,11 +116,11 @@ object SburbGame {
   class PlayerEntry(n:String = "", h:PlayerHouse = null) extends Serializable {
     @transient private var _game: SburbGame = null
     def game = _game
-    def game_=(g:SburbGame) = 
-      if (_game != null) 
+    def game_=(g:SburbGame) =
+      if (_game != null)
         throw new SburbException("Cannot assign game to PlayerEntry!")
       else _game = g
-    
+
     def name = n
     var server, client = ""
     var mediumId = 0
@@ -143,7 +143,7 @@ object SburbGame {
 
     val grist = new HashMap[Grist.Value, Long]
     val house: PlayerHouse = h
-    
+
     final def hasServer = !server.isEmpty
     final def hasClient = !client.isEmpty
     final def serverEntry = game entryOf server
@@ -151,35 +151,37 @@ object SburbGame {
     final def tryServerEntry = game tryEntryOf server
     final def tryClientEntry = game tryEntryOf client
 
-    final def eachServer(f: (PlayerEntry) => Unit, stopAtName: String): Unit = {
+    final def eachServer(f: (PlayerEntry) => Unit, stopAtName: String, doStop: Boolean): Unit = {
+      if (name.equalsIgnoreCase(stopAtName) && doStop) return
+
       tryServerEntry match {
         case Some(s) => {
           f(s)
-          if (s.server == name) return
-          else s.eachServer(f, stopAtName)
+          s.eachServer(f, stopAtName, true)
         }
         case None => return
       }
     }
     final def eachServer(f: (PlayerEntry) => Unit): Unit = {
-      eachServer(f, name)
+      eachServer(f, name, false)
     }
-    final def eachClient(f: (PlayerEntry) => Unit, stopAtName: String): Unit = {
+    final def eachClient(f: (PlayerEntry) => Unit, stopAtName: String, doStop: Boolean): Unit = {
+      if (name.equalsIgnoreCase(stopAtName) && doStop) return
+
       tryClientEntry match {
         case Some(s) => {
           f(s)
-          if (s.client == stopAtName) return
-          else s.eachClient(f, stopAtName)
+          s.eachClient(f, stopAtName, true)
         }
         case None => return
       }
     }
     final def eachClient(f: (PlayerEntry) => Unit): Unit = {
-      eachClient(f, name)
+      eachClient(f, name, false)
     }
-    
+
     // Gets the entities of the client / server players if they are online.
-    def serverPlayer = 
+    def serverPlayer =
       if (hasServer)
         Sburb.playerOfName(server)
       else null
@@ -187,7 +189,7 @@ object SburbGame {
       if (hasClient)
         Sburb.playerOfName(client)
       else null
-    
+
     // This should be called before Sburb data is cleared so the house can be returned.
     // ===
     // At this point I think it doesn't matter TOO much if there are duplicate houses
@@ -195,11 +197,11 @@ object SburbGame {
       // SburbGame.availableHouses += house
       // Sburb log "Returned house "+house.name
     }
-      
+
     private def str(s: String) = if (s.isEmpty) "---" else s
     override def toString() = house.name+": "+str(server)+" -> "+str(name)+" -> "+str(client)
   }
-  
+
   class PlayerHouse(_name:String, @(transient @param) world: World) extends Serializable {
     var _spawn: Vector3[Int] = new Vector3[Int]
     var minX: Int = 0
@@ -283,7 +285,7 @@ object SburbGame {
           Sburb log "Found a spot! ["+point.x+", "+point.y+", "+point.z+"]"
 
           placeAt(struct, world, point)
-          
+
           if (callback != null) callback(point)
         }
 
@@ -337,36 +339,36 @@ object SburbGame {
     var name = _name
 
     def spawn: Vector3[Int] = _spawn
-    
-    @transient lazy val maxFields = getClass.getDeclaredFields filter { 
+
+    @transient lazy val maxFields = getClass.getDeclaredFields filter {
       _.getName contains "max" }
-    @transient lazy val minFields = getClass.getDeclaredFields filter { 
+    @transient lazy val minFields = getClass.getDeclaredFields filter {
       _.getName contains "min" }
-    
+
     // Returns a string indicating which coordinate is out of bounds, and in
     // which direction. i.e. "x>" if pos.x is greater than maxX
     def outOfBounds(pos: Vector3[Double]): List[Symbol] = {
       def findField(fields: Array[Field], symb: Symbol) = {
         (fields find { f=>
-          f.getName endsWith symb.toString.toUpperCase()(1)+"" 
+          f.getName endsWith symb.toString.toUpperCase()(1)+""
         }).get
       }
-      
+
       pos foreach { (s:Symbol, v:Double) =>
         if (s != 'y) {
           val max = findField(maxFields, s)
           val min = findField(minFields, s)
-          
+
           max setAccessible true
           min setAccessible true
-          
+
           if (v > max.getInt(this))
             return s :: '> :: Nil
           if (v < min.getInt(this))
             return s :: '< :: Nil
         }
       }
-      
+
       Nil
     }
   }
@@ -376,11 +378,11 @@ class SburbGame(gid: String = "") extends Serializable {
   @transient val rand = new Random
 
   @transient var currentlySaving = false
-  
+
   var players = new HashMap[String, PlayerEntry]
-  
+
   def takenHouseNames = players.values map { _.house.name }
-  
+
   def onLoad() = {
     players foreach { kv =>
       val plr = kv._2
@@ -393,7 +395,7 @@ class SburbGame(gid: String = "") extends Serializable {
   def mediumColors() = players.values
                         .map(_.mediumColor)
                         .filter(_ != null)
-  
+
   // Makes sure the player's grist has all the correct grist types.
   def checkPlayerGrist(plr: PlayerEntry) = {
     Sburb log "Grist for "+plr.name+": "+plr.grist.toString
@@ -401,7 +403,7 @@ class SburbGame(gid: String = "") extends Serializable {
       plr.grist(_) = 0L
     }
   }
-  
+
   // If this is a new game; assign it a new game ID
   var gameId = if(gid.isEmpty) {
     var str = ""
@@ -427,8 +429,8 @@ class SburbGame(gid: String = "") extends Serializable {
       case availableHouses => { availableHouses(SburbGame.rand.nextInt(availableHouses.length)) }
     }
   }
-  
-  
+
+
   // Assign a client-server relationship. Players will be created if they don't exist.
   // Also doesn't care whether or not these names are real players, so don't call this.
   private def assignNames(client: String, server: String, force: Boolean = false) {
@@ -465,7 +467,7 @@ class SburbGame(gid: String = "") extends Serializable {
     }
     assignNames(clientProps.playerName, serverProps.playerName, force)
   }
-  
+
   // Add a new player with no associations to the game
   def newPlayer(plr: Any, wantedHouse: Any, logError: Boolean = true):Boolean = {
     var entityPlr: EntityPlayer = null
@@ -509,7 +511,7 @@ class SburbGame(gid: String = "") extends Serializable {
     }
     true
   }
-  
+
   // Get player entry of the given player, or throw exception if it isn't there
   final def entryOf(plr: Any) = {
     val aname = plr match {
@@ -522,7 +524,7 @@ class SburbGame(gid: String = "") extends Serializable {
     try {
       players(name)
     } catch {
-      case e: NoSuchElementException => throw new SburbException("There is no entry for "+name+" in game "+gameId) 
+      case e: NoSuchElementException => throw new SburbException("There is no entry for "+name+" in game "+gameId)
     }
   }
 
