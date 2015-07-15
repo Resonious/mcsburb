@@ -365,10 +365,12 @@ object Medium {
           playerEntry.lastPortalSpot = new Vector3[Int](point.x, portalY, point.z)
 
           playerEntry eachClient { clientEntry =>
-            if (clientEntry.mediumId != 0) spawnPortalsToMedium(clientEntry, playerEntry)
+            if (clientEntry.mediumId != 0 && clientEntry.lastPortalSpot != null)
+              spawnPortalsToMedium(clientEntry, playerEntry)
           }
           playerEntry eachServer { serverEntry =>
-            if (serverEntry.mediumId != 0) spawnPortalsToMedium(playerEntry, serverEntry)
+            if (serverEntry.mediumId != 0 && serverEntry.lastPortalSpot != null)
+              spawnPortalsToMedium(playerEntry, serverEntry)
           }
 
           startPlacingStuff(newWorld, playerEntry)
