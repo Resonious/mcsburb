@@ -151,25 +151,31 @@ object SburbGame {
     final def tryServerEntry = game tryEntryOf server
     final def tryClientEntry = game tryEntryOf client
 
-    final def eachServer(f: (PlayerEntry) => Unit): Unit = {
+    final def eachServer(f: (PlayerEntry) => Unit, stopAtName: String): Unit = {
       tryServerEntry match {
         case Some(s) => {
           f(s)
           if (s.server == name) return
-          else s.eachServer(f)
+          else s.eachServer(f, stopAtName)
+        }
+        case None => return
+      }
+    }
+    final def eachServer(f: (PlayerEntry) => Unit): Unit = {
+      eachServer(f, name)
+    }
+    final def eachClient(f: (PlayerEntry) => Unit, stopAtName: String): Unit = {
+      tryClientEntry match {
+        case Some(s) => {
+          f(s)
+          if (s.client == stopAtName) return
+          else s.eachClient(f, stopAtName)
         }
         case None => return
       }
     }
     final def eachClient(f: (PlayerEntry) => Unit): Unit = {
-      tryClientEntry match {
-        case Some(s) => {
-          f(s)
-          if (s.client == name) return
-          else s.eachClient(f)
-        }
-        case None => return
-      }
+      eachClient(f, name)
     }
     
     // Gets the entities of the client / server players if they are online.
