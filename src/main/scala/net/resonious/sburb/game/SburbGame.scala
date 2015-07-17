@@ -113,6 +113,7 @@ object SburbGame {
   val allHouseNames = new ArrayBuffer[String]
 
   // This structure contains all sburb-related state that used to be a part of SburbProperties
+  @SerialVersionUID(-4970160673116206907L)
   class PlayerEntry(n:String = "", h:PlayerHouse = null) extends Serializable {
     @transient private var _game: SburbGame = null
     def game = _game

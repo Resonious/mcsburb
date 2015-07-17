@@ -366,7 +366,7 @@ object Medium {
 
           Sburb log "=== Placing portals TO the new medium ==="
           playerEntry eachClient { clientEntry =>
-            if (clientEntry.mediumId != 0 && clientEntry.lastPortalSpot != null) {
+            if (clientEntry.mediumId != 0 && clientEntry.lastPortalSpot != null && clientEntry.name != playerEntry.name) {
               Sburb log "Placing portal in "+clientEntry.name+"'s medium"
               spawnPortalsToMedium(clientEntry, playerEntry)
             }
@@ -376,8 +376,8 @@ object Medium {
           }
           Sburb log "=== Placing portals IN the new medium ==="
           playerEntry eachServer { serverEntry =>
-            if (serverEntry.mediumId != 0 && serverEntry.lastPortalSpot != null) {
-              Sburb log "Placing portal to "+clientEntry.name+"'s medium"
+            if (serverEntry.mediumId != 0 && serverEntry.lastPortalSpot != null && serverEntry.name != playerEntry.name) {
+              Sburb log "Placing portal to "+serverEntry.name+"'s medium"
               spawnPortalsToMedium(playerEntry, serverEntry)
             }
             else {
