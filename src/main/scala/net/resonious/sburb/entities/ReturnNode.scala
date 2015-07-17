@@ -160,4 +160,18 @@ class ReturnNode(world: World) extends Portal(world) {
     color = new Vector3[Float](color.r * 0.9f, color.g * 0.9f, color.b * 0.9f)
     result
   }
+
+  override def onCollideWithPlayer(player: EntityPlayer): Unit = {
+    if (Sburb.isServer) {
+      (posX - player.posX, posZ - player.posZ) match {
+        case (x, y) => if (sqrt(x*x+y*y) <= warpRadius) {
+          val dim = if (targetDim == 0) world.provider.dimensionId
+                    else targetDim
+          val props = SburbProperties of player
+          if (!props.serverMode.activated)
+            Sburb.warpPlayer(player, dim, targetPos)
+        }
+      }
+    }
+  }
 }
